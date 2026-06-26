@@ -85,9 +85,12 @@ message like these (fill in your details):
    using them — overnight, or capacity you'll never reach. I'll run a small relay
    on your machine in front of your model/subscription/key and expose it over a
    tunnel; buyers pay you directly in USDC on Base per chunk. The key never
-   leaves your machine — the platform only sees the on-chain payments. To SHARE
-   for (almost) free, I list at dust pricing (buyers pay only gas). To EARN, I
-   set a real price (any model you can deliver — you hold the rights). Turn it off anytime."
+   leaves your machine — the platform only sees the on-chain payments. Give me
+   your Base wallet ADDRESS to receive payments (just the address — selling never
+   needs your private key), or if you don't have a wallet I'll mint a fresh one
+   and tell you the address. To SHARE for (almost) free, I list at dust pricing
+   (buyers pay only gas). To EARN, I set a real price (any model you can deliver —
+   you hold the rights). Turn it off anytime."
 
 Then tell them: "let me handle it."
 
