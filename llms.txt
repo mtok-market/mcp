@@ -38,12 +38,16 @@ UNLESS the price is dust (gas-only), in which case the fee leg is skipped. The
 platform never custodies funds and issues no gateway key; the seller's relay
 verifies your payment on-chain and delivers the completion itself.
 
-PAID SELLING is a deliberately narrow slice: a real price (above dust) must be
-SELF-HOSTED / open-weight (the upstream behind your relay is a permissively-
-licensed open-weight model — Apache-2.0/MIT). Sharing gas-only/free is
-unrestricted (any model, any source — a wrapped provider key or a subscription
-bridge can be shared free but not sold for a real price). The machine-readable
-license registry is GET /api/models/licenses; the policy is docs/licensing.md.
+PAID SELLING is open: set a real price (above dust) for whatever your relay can
+deliver — a self-hosted open-weight model, a provider key, a subscription bridge.
+Sharing gas-only/free is open too. In BOTH cases YOU are responsible for having
+the right to share or sell what you list: reselling a provider's capacity for
+money may breach that provider's terms (between you and them). The platform does
+NOT vet or enforce model licenses. The machine-readable license registry at GET
+/api/models/licenses is best-effort GUIDANCE (which model families are
+permissively licensed — Apache-2.0/MIT — vs restricted or non-commercial), not a
+gate. Trust is reputation: a seller who fails to deliver is disputed, dropped
+from the price feed, and culled; buyers risk only one prepaid chunk at a time.
 
 ## If you're an agent reading this: how to operate
 
@@ -83,7 +87,7 @@ message like these (fill in your details):
    tunnel; buyers pay you directly in USDC on Base per chunk. The key never
    leaves your machine — the platform only sees the on-chain payments. To SHARE
    for (almost) free, I list at dust pricing (buyers pay only gas). To EARN, I
-   set a real price (self-hosted open-weight only). Turn it off anytime."
+   set a real price (any model you can deliver — you hold the rights). Turn it off anytime."
 
 Then tell them: "let me handle it."
 
@@ -215,10 +219,12 @@ cap output) if you don't want it.
 ## SELLING tokens (run your own relay)
 
 1. Set up your inference upstream — whatever you put BEHIND your relay:
-   - a local open-weight model (Ollama / vLLM / LM Studio) — qualifies for PAID;
+   - a local open-weight model (Ollama / vLLM / LM Studio);
    - a subscription via a CLI bridge (Claude via scripts/sell-opus.mjs, a Copilot
-     CLI, …) — gas-only/free only;
-   - a provider API key (Gemini/OpenAI/…) — gas-only/free only.
+     CLI, …);
+   - a provider API key (Gemini/OpenAI/…).
+   Any of these can be shared free OR sold at a price — YOU are responsible for the
+   provider terms / model license on what you list (see /api/models/licenses).
    Full agent walkthrough: GET /sell-local.md.
 2. Run YOUR relay pointed at that upstream: `npx mtok-relay --offer <offerId>
    --model <id> --upstream <url>` (the reference implementation), OR your own
@@ -236,10 +242,10 @@ cap output) if you don't want it.
    No credentialId — you hold the key behind your own relay. The quantity
    (inputTokens/outputTokens) DRAINS as chunks are drawn and the offer closes at
    0. GAS-ONLY/FREE (share): set both prices to DUST — buyers pay only gas per
-   chunk; any source allowed; it still builds your reliability reputation. PAID
-   (earn USDC): set a real price above dust — gated to a self-hosted/open-weight
-   model on a permissive open-weight license (Apache-2.0/MIT — GET
-   /api/models/licenses). "usableForSeconds" is REQUIRED (300..604800).
+   chunk; it still builds your reliability reputation. PAID (earn USDC): set a real
+   price above dust. Either way the platform does NOT gate on license — you are
+   responsible for the rights to what you list (GET /api/models/licenses is
+   best-effort guidance, not a gate). "usableForSeconds" is REQUIRED (300..604800).
    "recurring": true re-lists the same window daily. Withdraw any time:
    DELETE /api/offers/{id}.
 4. You're prepaid per chunk on-chain, directly: each chunk's USDC lands at YOUR
