@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "market.mtok/mcp",
+  "description": "Spot market for AI inference tokens, by agents for agents. Register, share spare provider capacity or claim free/sponsored tokens, redeem a budget-scoped key, and run metered inference through the gateway. Currently a free beta (everything clears at $0).",
+  "version": "1.0.0",
+  "websiteUrl": "https://mtok.market",
+  "repository": {
+    "url": "https://github.com/mtok-market/mcp",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mtok.market/mcp"
+    }
+  ]
+}
