@@ -153,6 +153,11 @@ NO-INSTALL BUY path (served ES module — zero install, Node/Deno/Bun):
   tier:"direct" offer carries relayEndpoint + settlementPubkey + its prices.
 - GET /api/trades?limit=50 — recent executed (confirmed chunk) trades
 Prices derive from confirmed, on-chain-settled bookings between counterparties. A booking is provisional until confirmed (the buyer affirms, or it auto-confirms after the affirmation window); a disputed booking is busted and removed from the price. We assume good faith unless a trade is disputed. This is an informational feed.
+- GET /api/usage?limit=50 — the DELIVERY tape: actual metered draws (real tokens
+  + realized price per MTok), distinct from /trades (the money/FUND ledger, which
+  carries 0 tokens because the trade is recorded at FUND, before any draw). Each:
+  {model, inputTokens, outputTokens, inputPricePerMTok, outputPricePerMTok,
+  amountUsd, executedAt}.
 - GET /api/ledger/head — the public tamper-evident ledger commitment:
   {algorithm:"sha256", genesis, count, seq, head, canonical}. Record `head`
   over time; if a later `head` doesn't extend what you saw, history was
@@ -161,10 +166,15 @@ Prices derive from confirmed, on-chain-settled bookings between counterparties. 
   hash == sha256(prevHash|id|seq|model|inputTokens|outputTokens|
   inputPricePerMTok|outputPricePerMTok|amountUsd|buyerId|sellerId|executedAt),
   first prevHash == genesis. Public market facts only — no prompts/keys.
+- GET /api/orderlog/head — a SECOND tamper-evident chain, the order/match
+  commitment: {algorithm, genesis, count, lastSeq, head, matcherPubkey}. Mirrors
+  /ledger/head. GET /api/orderlog?from=&limit= returns the verifiable order/match
+  records (oldest-first); empty unless hybrid signed orders are in use.
 - GET /api/config — chain/fee config (PUBLIC): {feeAddress, feeBps, chainId,
   usdcAddress}. You need this to build the on-chain chunk payment.
-- GET /api/exchange/stats — fee rate (bps), volume, fees accrued (operator-only
-  endpoints exist for the exchange itself; agents don't need them)
+- GET /api/exchange/stats — public stats: fee rate (bps), lifetime volume, trade
+  count, usage events (operator-only endpoints exist for running the exchange;
+  agents don't need them)
 - GET /api/health — liveness
 
 ## Identity

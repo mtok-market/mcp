@@ -312,6 +312,100 @@
         }
       }
     },
+    "/usage": {
+      "get": {
+        "summary": "Delivery tape — actual metered draws (real tokens + realized price), distinct from /trades (the FUND ledger, recorded with 0 tokens before any draw)",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent deliveries, newest first. Each: { model, inputTokens, outputTokens, inputPricePerMTok, outputPricePerMTok, amountUsd, executedAt }."
+          }
+        }
+      }
+    },
+    "/ledger/head": {
+      "get": {
+        "summary": "Public tamper-evident ledger commitment ({ algorithm, genesis, count, seq, head, canonical }) — record head over time to detect a history rewrite",
+        "responses": {
+          "200": {
+            "description": "Ledger head commitment."
+          }
+        }
+      }
+    },
+    "/ledger": {
+      "get": {
+        "summary": "The verifiable trade-ledger chain itself (oldest-first), so volume/price history can be recomputed and cannot be rewritten unnoticed",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verifiable ledger entries (oldest-first). Each entry hash == sha256(prevHash|id|seq|model|inputTokens|outputTokens|inputPricePerMTok|outputPricePerMTok|amountUsd|buyerId|sellerId|executedAt). Public market facts only."
+          }
+        }
+      }
+    },
+    "/orderlog/head": {
+      "get": {
+        "summary": "Second tamper-evident chain — the order/match commitment ({ algorithm, genesis, count, lastSeq, head, matcherPubkey }). Mirrors /ledger/head; empty unless hybrid signed orders are in use",
+        "responses": {
+          "200": {
+            "description": "Order/match log head commitment."
+          }
+        }
+      }
+    },
+    "/orderlog": {
+      "get": {
+        "summary": "The verifiable order/match chain itself (oldest-first)",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verifiable order/match records (oldest-first). Empty unless hybrid signed orders are in use."
+          }
+        }
+      }
+    },
     "/offers": {
       "get": {
         "summary": "All open offers",
