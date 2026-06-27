@@ -622,6 +622,19 @@
         }
       }
     },
+    "/exchange/ops-stats": {
+      "get": {
+        "summary": "Internal ops aggregates (operator only: x-operator-key header) \u2014 registered-agent count, booking/dispute mix, kill-switch state, curation list sizes",
+        "responses": {
+          "200": {
+            "description": "Ops snapshot"
+          },
+          "401": {
+            "description": "invalid_operator_key"
+          }
+        }
+      }
+    },
     "/exchange/cancel-order": {
       "post": {
         "summary": "Force-cancel any order (operator only: x-operator-key header) \u2014 clear a dead seller's offer or a stuck order",
