@@ -583,6 +583,11 @@
                     "default": 0,
                     "description": "Also match offers whose usable window opens within this delay (0 = only currently-usable offers)"
                   },
+                  "priceOn": {
+                    "type": "string",
+                    "enum": ["input", "output"],
+                    "description": "Rank the returned routes[] by a single dimension: 'input' (cheapest input price first) or 'output' (cheapest output price first). Omit to rank by blended input+output cost."
+                  },
                   "expiresInSeconds": {
                     "type": "number",
                     "default": 3600,
