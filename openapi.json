@@ -892,7 +892,7 @@
             "description": "Caller is not the seller on the referenced offer."
           },
           "402": {
-            "description": "chunk_unpaid / chunk_fee_unpaid (FUND leg did not verify on-chain) or balance_exhausted (a DRAW would push usedUsd past paidUsd — top up first).",
+            "description": "chunk_unpaid / chunk_fee_unpaid (FUND leg did not verify on-chain) or balance_exhausted (a DRAW would push usedUsd past paidUsd — top up first). Separately, a DRAW past the booking's drawableUntil returns 410 balance_lapsed: the prepaid balance is short-lived (the offer window plus a window-length grace) and the undrawn remainder is then forfeit.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/Error" }
@@ -910,7 +910,7 @@
     },
     "/bookings/{id}": {
       "get": {
-        "summary": "Read a booking's prepaid balance (authenticated; the booking's BUYER or SELLER only). Returns paidUsd (sum of verified on-chain top-ups), usedUsd (sum of metered deliveries), and remainingUsd = paidUsd − usedUsd. The relay reads this before serving a draw.",
+        "summary": "Read a booking's prepaid balance (authenticated; the booking's BUYER or SELLER only). Returns paidUsd (sum of verified on-chain top-ups), usedUsd (sum of metered deliveries), remainingUsd = paidUsd − usedUsd, drawableUntil (the spot claim deadline: the offer's usable window plus a window-length grace), and lapsed (true once past drawableUntil). A prepaid balance is SHORT-LIVED: a LAPSED booking reads remainingUsd 0 and the undrawn balance is forfeit (a DRAW past the deadline returns 410 balance_lapsed). The relay reads this before serving a draw.",
         "security": [
           {
             "apiKey": []

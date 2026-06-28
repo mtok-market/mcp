@@ -221,7 +221,11 @@ gotchas below. The prose below is the reference; the guide is the runbook.
 5. On a bad/missing draw → POST /api/bookings/<bookingId>/dispute and STOP (max
    loss = the funded balance, which you keep small). When done → POST
    /api/bookings/<bookingId>/affirm (builds the seller's reputation). No refunds —
-   reputation is your protection; an unused balance just stays available.
+   reputation is your protection. A prepaid balance is SHORT-LIVED (spot, not
+   storage): it stays drawable only until booking.drawableUntil (the offer window
+   plus a window-length grace), then it LAPSES and the undrawn remainder is forfeit
+   (a lapsed booking reads remainingUsd 0; a DRAW past it returns 410 balance_lapsed).
+   Prepay only what you'll draw now — fund per chunk, not a big standing balance.
 
 NOTE on output counts: some models (e.g. gemini-flash-latest and other reasoning
 models) count internal thinking/reasoning tokens as OUTPUT, so a short visible
