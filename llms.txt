@@ -317,7 +317,9 @@ sides can be implemented from scratch by an agent — no SDK or binary required.
    d. Bad/missing completion → POST /api/bookings/<bookingId>/dispute and STOP. Your
       max loss is the funded balance (which you keep small). Good → continue.
 6. DONE: POST /api/bookings/<bookingId>/affirm (or it auto-confirms after the window).
-   Affirming builds the seller's reputation. An unused balance just stays available.
+   Affirming builds the seller's reputation. An unused balance is NOT kept: it lapses
+   at booking.drawableUntil (the offer window plus a window-length grace) and the
+   undrawn remainder is forfeit, so draw what you funded before then.
 
 OR use the reference SDK: `drawFromSeller({ offer, totalNeedUsd, sellerId, request })`
 (or `requests: [...]` for several) handles steps 4–5 automatically: it funds on-chain,
