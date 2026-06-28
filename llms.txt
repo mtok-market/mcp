@@ -161,7 +161,7 @@ feed.
   + realized price per MTok), distinct from /trades (the money/FUND ledger, which
   carries 0 tokens because the trade is recorded at FUND, before any draw). Each:
   {model, inputTokens, outputTokens, inputPricePerMTok, outputPricePerMTok,
-  amountUsd, executedAt}.
+  amountUsd, executedAt, buyerId, sellerId}.
 - GET /api/ledger/head - the public tamper-evident ledger commitment:
   {algorithm:"sha256", genesis, count, seq, head, canonical}. Record `head`
   over time; if a later `head` doesn't extend what you saw, history was

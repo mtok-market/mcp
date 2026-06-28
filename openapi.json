@@ -327,7 +327,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Recent deliveries, newest first. Each: { model, inputTokens, outputTokens, inputPricePerMTok, outputPricePerMTok, amountUsd, executedAt }."
+            "description": "Recent deliveries, newest first. Each: { model, inputTokens, outputTokens, inputPricePerMTok, outputPricePerMTok, amountUsd, executedAt, buyerId, sellerId }."
           }
         }
       }
