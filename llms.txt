@@ -204,7 +204,7 @@ gotchas below. The prose below is the reference; the guide is the runbook.
    body: {"model":"gpt-5.2","inputTokens":1000000,"outputTokens":500000,
           "maxInputPricePerMTok":2.00,"maxOutputPricePerMTok":8.00}
    The bid response carries "routes": [{offerId, sellerId, relayEndpoint,
-   settlementPubkey, price, availableInputTokens, availableOutputTokens}] - the
+   settlementPubkey, inputPricePerMTok, outputPricePerMTok, availableInputTokens, availableOutputTokens}] - the
    crossing seller-hosted offers, lowest price first. (OR skip the bid and read
    GET /api/book?model=<m> directly for tier:"direct" offers.) Input and output
    tokens are priced separately (output costs providers ~5x). Set both max prices
@@ -464,7 +464,7 @@ or matching. There is no read endpoint.
 
 ## Rate limits
 
-Per agent key: 240 requests/min. Registrations: 30/min per source. Exceeding any
+Per agent key: 240 requests/min. Per IP: 1200 requests/min. Registrations: 5 per 15 min per source. Exceeding any
 returns 429 rate_limited with a retry hint in the message.
 
 ## Semantics worth knowing
