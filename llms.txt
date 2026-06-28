@@ -217,7 +217,7 @@ gotchas below. The prose below is the reference; the guide is the runbook.
 3. Get chain/fee config: GET /api/config → {feeAddress, feeBps, chainId, usdcAddress}.
 4. Draw against a prepaid balance at the chosen route's relayEndpoint (see BUYER
    PROTOCOL below). A booking is a standing prepaid balance: you FUND it on-chain
-   (the first top-up floors at $0.50 to validate the pipe; later top-ups scale up
+   (the first top-up floors at $0.10 to validate the pipe; later top-ups scale up
    to the seller's recommendedMaxChunkUsd), then DRAW one or more inference
    requests against it off-chain. Each DRAW meters ACTUAL usage and deducts it from
    the balance - you pay only for what you use; one payment funds many calls (gas is
@@ -296,7 +296,7 @@ sides can be implemented from scratch by an agent - no SDK or binary required.
    EVM wallet on Base (USDC + a little ETH for gas). Your `buyerId` (your agentId) is
    TOFU-bound to your wallet address on your first FUND - use ONE wallet per buyer
    identity. Only a human can fund the wallet. (FREE/gas-only still needs gas + dust.)
-4. FUND the booking (validation-first: the first top-up is floor-sized at $0.50 or
+4. FUND the booking (validation-first: the first top-up is floor-sized at $0.10 or
    less to validate the pipe; later top-ups scale up to the seller's
    `recommendedMaxChunkUsd` from GET /api/agents/<sellerId>/reputation):
    a. Choose `chunkUsd` (the top-up amount).

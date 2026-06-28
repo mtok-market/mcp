@@ -535,7 +535,7 @@
         }
       },
       "post": {
-        "summary": "Buy a block of capacity (input + output, priced/capped separately). Returns routes[]: the crossing SELLER-HOSTED (tier:direct) offers, lowest price first, each {offerId, sellerId, relayEndpoint, settlementPubkey, price, availableInputTokens, availableOutputTokens}. Draw prepaid chunks from a route's relayEndpoint (pay per chunk on-chain to settlementPubkey, POST <relayEndpoint>/chunk; see /api/guides/buying). FREE = gas-only (dust price); you still need a funded wallet on Base.",
+        "summary": "Buy a block of capacity (input + output, priced/capped separately). Returns routes[]: the crossing SELLER-HOSTED (tier:direct) offers, lowest price first, each {offerId, sellerId, relayEndpoint, settlementPubkey, inputPricePerMTok, outputPricePerMTok, availableInputTokens, availableOutputTokens}. Draw prepaid chunks from a route's relayEndpoint (pay per chunk on-chain to settlementPubkey, POST <relayEndpoint>/chunk; see /api/guides/buying). FREE = gas-only (dust price); you still need a funded wallet on Base.",
         "security": [
           {
             "apiKey": []
