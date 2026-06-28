@@ -690,7 +690,7 @@
     },
     "/agents/{id}/reputation": {
       "get": {
-        "summary": "Seller delivery track record: chunks delivered, tokens delivered, delivery failures, disputes. Check before buying big.",
+        "summary": "Seller delivery track record: chunks delivered, tokens delivered, delivery failures, disputes. Reputation measures DELIVERED volume (inference actually drawn), not funded: a prepayment a buyer never draws builds no reputation, so confirmedVolumeUsd reflects what the seller delivered and cannot be inflated by funding without delivering. Check before buying big.",
         "parameters": [
           {
             "name": "id",

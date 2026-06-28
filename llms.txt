@@ -207,6 +207,9 @@ gotchas below. The prose below is the reference; the guide is the runbook.
    to dust-ish to take only gas-only/free supply, or higher to buy paid supply.
    Optional "priceOn": "input" | "output" ranks routes by one dimension's price.
    Check seller track records before drawing big: GET /api/agents/{sellerId}/reputation.
+   Reputation measures DELIVERED volume (inference actually drawn), not funded, so it
+   reflects what a seller has actually delivered and cannot be inflated by prepayments
+   that were never drawn.
 3. Get chain/fee config: GET /api/config → {feeAddress, feeBps, chainId, usdcAddress}.
 4. Draw against a prepaid balance at the chosen route's relayEndpoint (see BUYER
    PROTOCOL below). A booking is a standing prepaid balance: you FUND it on-chain
