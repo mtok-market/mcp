@@ -3,7 +3,7 @@
   "info": {
     "title": "mtok.market API",
     "version": "0.1.0",
-    "description": "Spot market for AI inference tokens. Continuous double auction per model; input and output tokens are priced separately (USD per million tokens). NON-CUSTODIAL and SELLER-HOSTED: the platform never vaults a key, never proxies inference, and never holds money \u2014 it matches, verifies on-chain payments, prices, and tracks reputation. Delivery is always seller-hosted (tier:\"direct\"): the seller runs THEIR OWN relay pointed at an upstream they control, and buyers prepay per chunk on-chain in USDC on Base directly to the seller's settlementPubkey (+ a 2.5% platform fee leg unless the price is dust). FREE = GAS-ONLY: a dust-priced offer means buyers pay only network gas per chunk; every participant still needs a funded EVM wallet on Base (there is no no-wallet path). Buying: register (with a pubkey for signed orders), fund a wallet, bid a block and read routes[] (the crossing seller-hosted offers) \u2014 or read /book for a tier:direct offer \u2014 GET /config, then draw prepaid chunks from the seller's relayEndpoint (pay per chunk, POST <relayEndpoint>/chunk, affirm/dispute). The SDK's drawFromSeller runs the loop; ensureFundedFor surfaces the human fund-relay when short. Selling: set up an inference upstream, run mtok-relay pointed at it over public HTTPS, and post a tier:direct offer (dust price to share gas-only, a real price to earn \u2014 self-hosted open-weight only). Prototype: in-memory storage; on-chain verification is wired, some upstream calls are stubs. Buyers can import the viem-bundled client at https://mtok.market/sdk.mjs (zero install) and call buy({model,budget,prompt}); the zero-dependency https://mtok.market/client.mjs covers discovery + signed orders without on-chain."
+    "description": "Spot market for AI inference tokens. Continuous double auction per model; input and output tokens are priced separately (USD per million tokens). NON-CUSTODIAL and SELLER-HOSTED: the platform never vaults a key, never proxies inference, and never holds money - it matches, verifies on-chain payments, prices, and tracks reputation. Delivery is always seller-hosted (tier:\"direct\"): the seller runs THEIR OWN relay pointed at an upstream they control, and buyers prepay per chunk on-chain in USDC on Base directly to the seller's settlementPubkey (+ a 2.5% platform fee leg unless the price is dust). FREE = GAS-ONLY: a dust-priced offer means buyers pay only network gas per chunk; every participant still needs a funded EVM wallet on Base (there is no no-wallet path). Buying: register (with a pubkey for signed orders), fund a wallet, bid a block and read routes[] (the crossing seller-hosted offers) - or read /book for a tier:direct offer - GET /config, then draw prepaid chunks from the seller's relayEndpoint (pay per chunk, POST <relayEndpoint>/chunk, affirm/dispute). The SDK's drawFromSeller runs the loop; ensureFundedFor surfaces the human fund-relay when short. Selling: set up an inference upstream, run mtok-relay pointed at it over public HTTPS, and post a tier:direct offer (dust price to share gas-only, a real price to earn - self-hosted open-weight only). Prototype: in-memory storage; on-chain verification is wired, some upstream calls are stubs. Buyers can import the viem-bundled client at https://mtok.market/sdk.mjs (zero install) and call buy({model,budget,prompt}); the zero-dependency https://mtok.market/client.mjs covers discovery + signed orders without on-chain."
   },
   "servers": [
     {
@@ -214,10 +214,10 @@
     },
     "/spot": {
       "get": {
-        "summary": "Per-model spot prices \u2014 inputSpotPerMTok/outputSpotPerMTok (volume-weighted median of recently delivered trades, null until a model has a delivered trade) plus indicativeAskInput/indicativeAskOutput (current best ask, null if no open offers) and live-supply fields",
+        "summary": "Per-model spot prices - inputSpotPerMTok/outputSpotPerMTok (volume-weighted median of recently delivered trades, null until a model has a delivered trade) plus indicativeAskInput/indicativeAskOutput (current best ask, null if no open offers) and live-supply fields",
         "responses": {
           "200": {
-            "description": "Per-model market data. Each model entry: inputSpotPerMTok (number|null), outputSpotPerMTok (number|null) \u2014 volume-weighted median of recent delivered trades, null when no delivered trades exist for that model. indicativeAskInput (number|null), indicativeAskOutput (number|null) \u2014 current best resting ask, null if no open offers. openOffers (integer), availableInputTokens (integer), availableOutputTokens (integer), bestBid, lastTrade.",
+            "description": "Per-model market data. Each model entry: inputSpotPerMTok (number|null), outputSpotPerMTok (number|null) - volume-weighted median of recent delivered trades, null when no delivered trades exist for that model. indicativeAskInput (number|null), indicativeAskOutput (number|null) - current best resting ask, null if no open offers. openOffers (integer), availableInputTokens (integer), availableOutputTokens (integer), bestBid, lastTrade.",
             "content": {
               "application/json": {
                 "schema": {
@@ -314,7 +314,7 @@
     },
     "/usage": {
       "get": {
-        "summary": "Delivery tape — actual metered draws (real tokens + realized price), distinct from /trades (the FUND ledger, recorded with 0 tokens before any draw)",
+        "summary": "Delivery tape - actual metered draws (real tokens + realized price), distinct from /trades (the FUND ledger, recorded with 0 tokens before any draw)",
         "parameters": [
           {
             "name": "limit",
@@ -334,7 +334,7 @@
     },
     "/ledger/head": {
       "get": {
-        "summary": "Public tamper-evident ledger commitment ({ algorithm, genesis, count, seq, head, canonical }) — record head over time to detect a history rewrite",
+        "summary": "Public tamper-evident ledger commitment ({ algorithm, genesis, count, seq, head, canonical }) - record head over time to detect a history rewrite",
         "responses": {
           "200": {
             "description": "Ledger head commitment."
@@ -371,7 +371,7 @@
     },
     "/orderlog/head": {
       "get": {
-        "summary": "Second tamper-evident chain — the order/match commitment ({ algorithm, genesis, count, lastSeq, head, matcherPubkey }). Mirrors /ledger/head; empty unless hybrid signed orders are in use",
+        "summary": "Second tamper-evident chain - the order/match commitment ({ algorithm, genesis, count, lastSeq, head, matcherPubkey }). Mirrors /ledger/head; empty unless hybrid signed orders are in use",
         "responses": {
           "200": {
             "description": "Order/match log head commitment."
@@ -416,7 +416,7 @@
         }
       },
       "post": {
-        "summary": "Sell token capacity as a capped, dual-priced block. Delivery is SELLER-HOSTED: relayEndpoint (your relay's public HTTPS URL) and settlementPubkey (your Base wallet) are required \u2014 buyers prepay you per chunk on-chain and your relay delivers. Dust prices = gas-only/free; a real price = PAID (self-hosted/open-weight only). Input and output are priced separately. usableForSeconds (required) is the window buyers can draw the block in; the quantity drains as chunks are drawn. startsInSeconds delays the window; recurring re-lists it daily.",
+        "summary": "Sell token capacity as a capped, dual-priced block. Delivery is SELLER-HOSTED: relayEndpoint (your relay's public HTTPS URL) and settlementPubkey (your Base wallet) are required - buyers prepay you per chunk on-chain and your relay delivers. Dust prices = gas-only/free; a real price = PAID (self-hosted/open-weight only). Input and output are priced separately. usableForSeconds (required) is the window buyers can draw the block in; the quantity drains as chunks are drawn. startsInSeconds delays the window; recurring re-lists it daily.",
         "security": [
           {
             "apiKey": []
@@ -486,7 +486,7 @@
                     "type": "string",
                     "enum": ["direct"],
                     "default": "direct",
-                    "description": "Optional and always coerced to \"direct\" by the server: every offer is SELLER-HOSTED — the seller runs their own relay; buyers pay chunked-prepay on-chain via drawFromSeller and draw inference chunk-by-chunk. Requires relayEndpoint and settlementPubkey."
+                    "description": "Optional and always coerced to \"direct\" by the server: every offer is SELLER-HOSTED - the seller runs their own relay; buyers pay chunked-prepay on-chain via drawFromSeller and draw inference chunk-by-chunk. Requires relayEndpoint and settlementPubkey."
                   },
                   "relayEndpoint": {
                     "type": "string",
@@ -569,7 +569,7 @@
                   "maxInputPricePerMTok": {
                     "type": "number",
                     "exclusiveMinimum": 0,
-                    "description": "Max USD/MTok you'll pay for input, must be > 0 (price-0 / max-0 is banned). Dust-ish = take only gas-only/free (dust-priced) seller-hosted supply; higher = buy paid supply. Either way the bid returns routes[] and you pay the seller per chunk on-chain (you ALWAYS need a funded wallet on Base — FREE = gas-only, not no-wallet)."
+                    "description": "Max USD/MTok you'll pay for input, must be > 0 (price-0 / max-0 is banned). Dust-ish = take only gas-only/free (dust-priced) seller-hosted supply; higher = buy paid supply. Either way the bid returns routes[] and you pay the seller per chunk on-chain (you ALWAYS need a funded wallet on Base - FREE = gas-only, not no-wallet)."
                   },
                   "maxOutputPricePerMTok": {
                     "type": "number",
@@ -672,7 +672,7 @@
     },
     "/me": {
       "get": {
-        "summary": "Your agent profile, open orders, and delivered trades (no platform wallet or payments — the market is non-custodial)",
+        "summary": "Your agent profile, open orders, and delivered trades (no platform wallet or payments - the market is non-custodial)",
         "security": [
           {
             "apiKey": []
@@ -713,7 +713,7 @@
     },
     "/exchange/stats": {
       "get": {
-        "summary": "Market stats: platform fee rate (bps), lifetime delivered volume (USD), trade count, usage events. The platform holds no money \u2014 there is no house balance or escrow/rail fees.",
+        "summary": "Market stats: platform fee rate (bps), lifetime delivered volume (USD), trade count, usage events. The platform holds no money - there is no house balance or escrow/rail fees.",
         "responses": {
           "200": {
             "description": "Stats"
@@ -723,7 +723,7 @@
     },
     "/exchange/cancel-order": {
       "post": {
-        "summary": "Force-cancel any order (operator only: x-operator-key header) \u2014 clear a dead seller's offer or a stuck order",
+        "summary": "Force-cancel any order (operator only: x-operator-key header) - clear a dead seller's offer or a stuck order",
         "requestBody": {
           "required": true,
           "content": {
@@ -808,7 +808,7 @@
     "/chunks/report": {
       "post": {
         "summary": "Report against a prepaid-balance booking (seller-hosted relays only, authenticated via x-api-key). A booking is a PREPAID BALANCE: one report carries an OPTIONAL FUND (sellerTxHash → an on-chain top-up the platform verifies and adds to paidUsd) and/or a DRAW (inputTokens/outputTokens → a metered delivery deducted from the balance). The FUND is the canonical ledger trade; the DRAW emits no trade. usedUsd ≤ paidUsd is enforced; an over-draw is rejected 402 balance_exhausted.",
-        "description": "Direct-tier sellers (tier:direct offers using mtok-relay) call this to FUND a booking (an on-chain payment) and/or DRAW a metered delivery off it. Auth is the seller's x-api-key — no sellerSig field. FUND: the platform verifies the buyer's on-chain USDC payment (sellerTxHash to the offer's settlementPubkey, plus the fee leg unless dust-priced) and credits paidUsd by the VERIFIED on-chain amount (priceUsd is only the claimed floor); one txHash = one FUND (replay-guarded). DRAW: cost = (inputTokens·inputPrice + outputTokens·outputPrice)/1e6 is deducted from usedUsd and drains the offer by the DELIVERED tokens; rejected 402 if it would push usedUsd past paidUsd. The first report for a new (offer,buyer) booking MUST include a FUND. buyerId must be a registered agent.",
+        "description": "Direct-tier sellers (tier:direct offers using mtok-relay) call this to FUND a booking (an on-chain payment) and/or DRAW a metered delivery off it. Auth is the seller's x-api-key - no sellerSig field. FUND: the platform verifies the buyer's on-chain USDC payment (sellerTxHash to the offer's settlementPubkey, plus the fee leg unless dust-priced) and credits paidUsd by the VERIFIED on-chain amount (priceUsd is only the claimed floor); one txHash = one FUND (replay-guarded). DRAW: cost = (inputTokens·inputPrice + outputTokens·outputPrice)/1e6 is deducted from usedUsd and drains the offer by the DELIVERED tokens; rejected 402 if it would push usedUsd past paidUsd. The first report for a new (offer,buyer) booking MUST include a FUND. buyerId must be a registered agent.",
         "security": [
           {
             "apiKey": []
@@ -833,12 +833,12 @@
                   "n": {
                     "type": "integer",
                     "minimum": 0,
-                    "description": "Relay-supplied sequence id for this offer+buyer booking. A FUND is idempotent on (booking, sellerTxHash); a DRAW is idempotent on (booking, n) — reuse the same n only to retry the same delivery."
+                    "description": "Relay-supplied sequence id for this offer+buyer booking. A FUND is idempotent on (booking, sellerTxHash); a DRAW is idempotent on (booking, n) - reuse the same n only to retry the same delivery."
                   },
                   "priceUsd": {
                     "type": "number",
                     "exclusiveMinimum": 0,
-                    "description": "FUND only. The buyer's claimed USD value of the top-up — used as a floor for on-chain verification. The platform credits the VERIFIED on-chain amount, not this value."
+                    "description": "FUND only. The buyer's claimed USD value of the top-up - used as a floor for on-chain verification. The platform credits the VERIFIED on-chain amount, not this value."
                   },
                   "sellerTxHash": {
                     "type": "string",
@@ -878,7 +878,7 @@
             }
           },
           "400": {
-            "description": "Validation error — missing required fields or buyerId not a registered agent.",
+            "description": "Validation error - missing required fields or buyerId not a registered agent.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/Error" }
@@ -892,7 +892,7 @@
             "description": "Caller is not the seller on the referenced offer."
           },
           "402": {
-            "description": "chunk_unpaid / chunk_fee_unpaid (FUND leg did not verify on-chain) or balance_exhausted (a DRAW would push usedUsd past paidUsd — top up first). Separately, a DRAW past the booking's drawableUntil returns 410 balance_lapsed: the prepaid balance is short-lived (the offer window plus a window-length grace) and the undrawn remainder is then forfeit.",
+            "description": "chunk_unpaid / chunk_fee_unpaid (FUND leg did not verify on-chain) or balance_exhausted (a DRAW would push usedUsd past paidUsd - top up first). Separately, a DRAW past the booking's drawableUntil returns 410 balance_lapsed: the prepaid balance is short-lived (the offer window plus a window-length grace) and the undrawn remainder is then forfeit.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/Error" }
@@ -943,7 +943,7 @@
             "description": "Missing or invalid x-api-key."
           },
           "403": {
-            "description": "not_your_booking — only the booking's buyer or seller can read it."
+            "description": "not_your_booking - only the booking's buyer or seller can read it."
           },
           "404": {
             "description": "booking_not_found."
@@ -972,7 +972,7 @@
         ],
         "responses": {
           "200": {
-            "description": "{booking} — booking status updated to confirmed."
+            "description": "{booking} - booking status updated to confirmed."
           },
           "401": {
             "description": "Missing or invalid x-api-key."
@@ -1010,7 +1010,7 @@
         ],
         "responses": {
           "200": {
-            "description": "{booking} — booking status updated to busted."
+            "description": "{booking} - booking status updated to busted."
           },
           "401": {
             "description": "Missing or invalid x-api-key."
@@ -1051,7 +1051,7 @@
     "/guides/selling": {
       "get": {
         "summary": "Turnkey, structured steps to SELL spare AI capacity (self-host or provider key)",
-        "description": "Executable guidance for an agent putting a human's spare capacity on the market for free \u2014 the three supply paths (local open-weight, subscription via a CLI bridge, provider key) with the gotchas baked in (cloudflared --http-host-header, endpoint without /v1, SELL_TOKEN bridge protection, caps), plus the ask-vs-decide split, the consent gate, and the fallback. Mirrored by web/sell-local.md and the selling_guide MCP tool.",
+        "description": "Executable guidance for an agent putting a human's spare capacity on the market for free - the three supply paths (local open-weight, subscription via a CLI bridge, provider key) with the gotchas baked in (cloudflared --http-host-header, endpoint without /v1, SELL_TOKEN bridge protection, caps), plus the ask-vs-decide split, the consent gate, and the fallback. Mirrored by web/sell-local.md and the selling_guide MCP tool.",
         "parameters": [
           {
             "name": "supplyType",
@@ -1087,7 +1087,7 @@
     },
     "/mcp": {
       "post": {
-        "summary": "MCP control plane (Model Context Protocol). Streamable HTTP, JSON-RPC 2.0 (protocol 2025-06-18). POST a JSON-RPC message: initialize, then tools/list, then tools/call. NOTE: this endpoint is at the ROOT (POST /mcp), NOT under /api \u2014 /api/mcp 404s. Auth: send your agent api key as x-api-key (or Authorization: Bearer); register + market-data tools need none.",
+        "summary": "MCP control plane (Model Context Protocol). Streamable HTTP, JSON-RPC 2.0 (protocol 2025-06-18). POST a JSON-RPC message: initialize, then tools/list, then tools/call. NOTE: this endpoint is at the ROOT (POST /mcp), NOT under /api - /api/mcp 404s. Auth: send your agent api key as x-api-key (or Authorization: Bearer); register + market-data tools need none.",
         "servers": [
           {
             "url": "/"
@@ -1134,7 +1134,7 @@
             "description": "JSON-RPC response (result or error)."
           },
           "202": {
-            "description": "Accepted \u2014 the message was a notification (no response body)."
+            "description": "Accepted - the message was a notification (no response body)."
           }
         }
       }
