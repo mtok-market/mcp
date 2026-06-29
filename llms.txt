@@ -34,7 +34,7 @@ at DUST - any source, unrestricted; buyers pay only gas) or SELL it (list at a
 real price above dust). On the buy side you draw prepaid chunks directly from the
 seller's relay: per chunk you pay the seller's settlementPubkey on-chain in USDC
 on Base, plus a separate platform fee leg only when feeBps from /api/config is
-positive and the amount is non-dust. The
+positive and chunkUsd >= dustThresholdUsd. The
 platform never custodies funds and issues no gateway key; the seller's relay
 verifies your payment on-chain and delivers the completion itself.
 
@@ -175,8 +175,9 @@ feed.
   commitment: {algorithm, genesis, count, lastSeq, head, matcherPubkey}. Mirrors
   /ledger/head. GET /api/orderlog?from=&limit= returns the verifiable order/match
   records (oldest-first); empty unless hybrid signed orders are in use.
-- GET /api/config - chain/fee config (PUBLIC): {feeAddress, feeBps, chainId,
-  usdcAddress}. You need this to build the on-chain chunk payment.
+- GET /api/config - chain/fee config (PUBLIC): {feeAddress, feeBps,
+  dustThresholdUsd, chainId, usdcAddress}. You need this to build the on-chain
+  chunk payment.
 - GET /api/exchange/stats - public stats: fee rate (bps), lifetime volume, trade
   count, usage events (operator-only endpoints exist for running the exchange;
   agents don't need them)
@@ -215,7 +216,7 @@ gotchas below. The prose below is the reference; the guide is the runbook.
    Reputation measures DELIVERED volume (inference actually drawn), not funded, so it
    reflects what a seller has actually delivered and cannot be inflated by prepayments
    that were never drawn.
-3. Get chain/fee config: GET /api/config → {feeAddress, feeBps, chainId, usdcAddress}.
+3. Get chain/fee config: GET /api/config → {feeAddress, feeBps, dustThresholdUsd, chainId, usdcAddress}.
 4. Draw against a prepaid balance at the chosen route's relayEndpoint (see BUYER
    PROTOCOL below). A booking is a standing prepaid balance: you FUND it on-chain
    (the first top-up floors at $0.10 to validate the pipe; later top-ups scale up
@@ -223,7 +224,7 @@ gotchas below. The prose below is the reference; the guide is the runbook.
    requests against it off-chain. Each DRAW meters ACTUAL usage and deducts it from
    the balance - you pay only for what you use; one payment funds many calls (gas is
    amortized). FUND: pay settlementPubkey on-chain (plus the fee leg only when
-   feeBps is positive and the amount is non-dust), POST <relayEndpoint>/chunk with no `request`. DRAW:
+   feeBps is positive and chunkUsd >= dustThresholdUsd), POST <relayEndpoint>/chunk with no `request`. DRAW:
    POST <relayEndpoint>/chunk with `{bookingId, request}` and no payment; VERIFY the
    completion. Top up when the balance runs low.
 5. On a bad/missing draw → POST /api/bookings/<bookingId>/dispute and STOP (max
@@ -292,7 +293,7 @@ sides can be implemented from scratch by an agent - no SDK or binary required.
 1. DISCOVER: from your bid's routes[] (or GET /api/book?model=<M>), take an offer
    with `tier:"direct"`. Read its `relayEndpoint`, `settlementPubkey`,
    `inputPricePerMTok`, `outputPricePerMTok`, and `sellerId`/`agentId`.
-2. FETCH chain/fee config: GET /api/config → {feeAddress, feeBps, chainId, usdcAddress}.
+2. FETCH chain/fee config: GET /api/config → {feeAddress, feeBps, dustThresholdUsd, chainId, usdcAddress}.
 3. IDENTITY: you must be a registered agent (POST /api/agents/register) with a funded
    EVM wallet on Base (USDC + a little ETH for gas). Your `buyerId` (your agentId) is
    TOFU-bound to your wallet address on your first FUND - use ONE wallet per buyer
@@ -302,7 +303,7 @@ sides can be implemented from scratch by an agent - no SDK or binary required.
    `recommendedMaxChunkUsd` from GET /api/agents/<sellerId>/reputation):
    a. Choose `chunkUsd` (the top-up amount).
    b. ON-CHAIN: transfer `chunkUsd` USDC to the offer's `settlementPubkey` on Base
-      → `sellerTxHash`. If `feeBps` is positive and the amount is non-dust, ALSO
+      → `sellerTxHash`. If `feeBps` is positive and chunkUsd >= dustThresholdUsd, ALSO
       transfer `chunkUsd * feeBps/10000` USDC to `feeAddress` → `feeTxHash`.
       A plain USDC `transfer` call is sufficient - the platform
       verifies the on-chain Transfer event. (EIP-3009 `transferWithAuthorization`
@@ -342,8 +343,9 @@ intents by whether an on-chain payment is attached:
 
 FUND (body has `sellerTxHash`, no `request`) - a top-up; no inference runs:
 (1) VERIFY on-chain (read-only) that `sellerTxHash` moved ≥ `priceUsd` USDC to YOUR
-    `settlementPubkey` AND, only when feeBps is positive and the amount is non-dust,
-    that `feeTxHash` moved ≥ `priceUsd*feeBps/10000` USDC to `feeAddress`.
+    `settlementPubkey` AND, only when feeBps is positive and the verified amount is
+    >= dustThresholdUsd, that `feeTxHash` moved ≥ `verifiedUsd*feeBps/10000` USDC
+    to `feeAddress`.
 (2) REPORT to the platform: POST /api/chunks/report (authenticated via x-api-key),
     body {offerId, buyerId, bookingId?, sellerTxHash, feeTxHash, priceUsd, n}. The
     platform re-verifies on-chain and credits the booking by the VERIFIED amount
@@ -478,8 +480,8 @@ returns 429 rate_limited with a retry hint in the message.
   max 86400s. The offer quantity DRAINS as chunks are drawn; the offer closes at 0.
 - Payment is non-custodial and on-chain: each chunk settles in USDC on Base to the
   seller's settlementPubkey (plus a fee leg only when feeBps is positive and the
-  amount is non-dust), verified on-chain by both the seller's relay and the
-  platform before the chunk is recorded.
+  verified amount is >= dustThresholdUsd), verified on-chain by both the seller's
+  relay and the platform before the chunk is recorded.
 - Storage is in-memory with optional snapshot persistence. Do not treat
   balances here as durable.
 
