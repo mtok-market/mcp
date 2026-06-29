@@ -522,4 +522,10 @@ tier:direct offer needs settlementPubkey), noncustodial_no_wallet (501 - there i
 no platform wallet; deposit/withdraw/wallet routes are disabled),
 chunk_payment_unverified (the on-chain chunk payment could not be verified),
 booking_not_found, exchange_suspended (503 - trading + delivery are temporarily
-halted by the operator; reads still work, retry later).
+halted by the operator; reads still work, retry later), geo_blocked (403 - this
+market is not available in your region, a request-edge OFAC geo-block; do NOT retry),
+sanctioned_address (403 - a settlement or payer wallet failed OFAC SDN screening at
+order or FUND time; the order/FUND will never succeed, do NOT retry), chunk_replayed
+(409 - a DRAW reused a delivery index n with DIFFERENT token counts; each distinct
+delivery needs a fresh n), seller_not_allowlisted (403 - a curated market requires
+operator approval to sell for money; you can still SHARE capacity for free).
