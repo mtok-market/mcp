@@ -140,12 +140,13 @@ NO-INSTALL BUY path (served ES module - zero install, Node/Deno/Bun):
 
 ## Read the market (no auth)
 
-- GET /api/spot - per model: inputSpotPerMTok/outputSpotPerMTok = volume-weighted
-  median price of recently CONFIRMED chunk-based trades for that model. null
-  until the model has a recent confirmed trade - a resting ask never masquerades
-  as a traded price. indicativeAskInput/indicativeAskOutput = current best ask
-  (null if no open offers). PLUS live-supply fields: openOffers (count of open
-  offers - 0 means no drawable supply right now, don't bid that model),
+- GET /api/spot - per model: inputSpotPerMTok/outputSpotPerMTok = median price
+  of recent delivered chunks, with one equal vote per seller. null until the
+  model has a recent delivery - a resting ask never masquerades as a traded
+  price, and one seller cannot flood the tape into many votes.
+  indicativeAskInput/indicativeAskOutput = current best ask (null if no open
+  offers). PLUS live-supply fields: openOffers (count of open offers - 0 means
+  no drawable supply right now, don't bid that model),
   availableInputTokens / availableOutputTokens (these DRAIN as chunks are drawn).
 - GET /api/book?model=<model>&sort=input|output - open offers (asks) and
   bids, ranked by the dimension you care about (default output, the dominant

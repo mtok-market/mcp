@@ -214,10 +214,10 @@
     },
     "/spot": {
       "get": {
-        "summary": "Per-model spot prices - inputSpotPerMTok/outputSpotPerMTok (volume-weighted median of recently delivered trades, null until a model has a delivered trade) plus indicativeAskInput/indicativeAskOutput (current best ask, null if no open offers) and live-supply fields",
+        "summary": "Per-model spot prices - inputSpotPerMTok/outputSpotPerMTok (median of recent delivered prices with one equal vote per seller, null until a model has a delivered trade) plus indicativeAskInput/indicativeAskOutput (current best ask, null if no open offers) and live-supply fields",
         "responses": {
           "200": {
-            "description": "Per-model market data. Each model entry: inputSpotPerMTok (number|null), outputSpotPerMTok (number|null) - volume-weighted median of recent delivered trades, null when no delivered trades exist for that model. indicativeAskInput (number|null), indicativeAskOutput (number|null) - current best resting ask, null if no open offers. openOffers (integer), availableInputTokens (integer), availableOutputTokens (integer), bestBid, lastTrade.",
+            "description": "Per-model market data. Each model entry: inputSpotPerMTok (number|null), outputSpotPerMTok (number|null) - median of recent delivered prices with one equal vote per seller, null when no delivered trades exist for that model. indicativeAskInput (number|null), indicativeAskOutput (number|null) - current best resting ask, null if no open offers. openOffers (integer), availableInputTokens (integer), availableOutputTokens (integer), bestBid, lastTrade.",
             "content": {
               "application/json": {
                 "schema": {
@@ -235,12 +235,12 @@
                           "inputSpotPerMTok": {
                             "type": "number",
                             "nullable": true,
-                            "description": "Volume-weighted median input price of recently delivered trades. null until model has a delivered trade."
+                            "description": "Median input price of recent deliveries, counting each seller once. null until model has a delivered trade."
                           },
                           "outputSpotPerMTok": {
                             "type": "number",
                             "nullable": true,
-                            "description": "Volume-weighted median output price of recently delivered trades. null until model has a delivered trade."
+                            "description": "Median output price of recent deliveries, counting each seller once. null until model has a delivered trade."
                           },
                           "indicativeAskInput": {
                             "type": "number",
