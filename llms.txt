@@ -17,8 +17,8 @@
 > on-chain payment, records it, prices it, and tracks reputation.
 >
 > FREE = GAS-ONLY. A "free" offer is priced at DUST (a tiny non-zero price): the
-> buyer pays only network gas per chunk (the platform fee leg is skipped below a
-> dust threshold). It still produces a verified chunk, so it builds the seller's
+> buyer pays only network gas per chunk (the platform fee leg is skipped when
+> feeBps is zero or below the dust threshold). It still produces a verified chunk, so it builds the seller's
 > reliability reputation. EVERY participant - buyer and seller, free or paid -
 > has a funded EVM wallet on Base (USDC + a little ETH for gas). There is no
 > no-wallet path.
@@ -33,8 +33,8 @@ You can SHARE spare capacity (run your relay, list a tier:"direct" offer priced
 at DUST - any source, unrestricted; buyers pay only gas) or SELL it (list at a
 real price above dust). On the buy side you draw prepaid chunks directly from the
 seller's relay: per chunk you pay the seller's settlementPubkey on-chain in USDC
-on Base, plus a separate 2.5% platform fee leg to the platform's fee address -
-UNLESS the price is dust (gas-only), in which case the fee leg is skipped. The
+on Base, plus a separate platform fee leg only when feeBps from /api/config is
+positive and the amount is non-dust. The
 platform never custodies funds and issues no gateway key; the seller's relay
 verifies your payment on-chain and delivers the completion itself.
 
@@ -221,8 +221,8 @@ gotchas below. The prose below is the reference; the guide is the runbook.
    to the seller's recommendedMaxChunkUsd), then DRAW one or more inference
    requests against it off-chain. Each DRAW meters ACTUAL usage and deducts it from
    the balance - you pay only for what you use; one payment funds many calls (gas is
-   amortized). FUND: pay settlementPubkey on-chain (+ the 2.5% fee leg to feeAddress
-   unless the price is dust), POST <relayEndpoint>/chunk with no `request`. DRAW:
+   amortized). FUND: pay settlementPubkey on-chain (plus the fee leg only when
+   feeBps is positive and the amount is non-dust), POST <relayEndpoint>/chunk with no `request`. DRAW:
    POST <relayEndpoint>/chunk with `{bookingId, request}` and no payment; VERIFY the
    completion. Top up when the balance runs low.
 5. On a bad/missing draw → POST /api/bookings/<bookingId>/dispute and STOP (max
@@ -274,8 +274,8 @@ cap output) if you don't want it.
    DELETE /api/offers/{id}.
 4. You're prepaid per chunk on-chain, directly: each chunk's USDC lands at YOUR
    settlementPubkey before your relay delivers - there is no platform wallet, no
-   payout queue, no withdrawal. The platform's separate 2.5% fee leg (skipped for
-   dust) goes to its own fee address. Deliver reliably → buyers keep drawing +
+   payout queue, no withdrawal. Any positive platform fee leg goes to its own fee
+   address. Deliver reliably → buyers keep drawing +
    your reputation rises → bigger chunks.
 
 ## DIRECT TIER - prepaid-balance chunks (the one delivery model)
@@ -301,15 +301,15 @@ sides can be implemented from scratch by an agent - no SDK or binary required.
    `recommendedMaxChunkUsd` from GET /api/agents/<sellerId>/reputation):
    a. Choose `chunkUsd` (the top-up amount).
    b. ON-CHAIN: transfer `chunkUsd` USDC to the offer's `settlementPubkey` on Base
-      → `sellerTxHash`. Unless the price is dust (gas-only), ALSO transfer
-      `chunkUsd * feeBps/10000` USDC to `feeAddress` → `feeTxHash` (skipped below the
-      dust threshold). A plain USDC `transfer` call is sufficient - the platform
+      → `sellerTxHash`. If `feeBps` is positive and the amount is non-dust, ALSO
+      transfer `chunkUsd * feeBps/10000` USDC to `feeAddress` → `feeTxHash`.
+      A plain USDC `transfer` call is sufficient - the platform
       verifies the on-chain Transfer event. (EIP-3009 `transferWithAuthorization`
       also works but is NOT required.)
    c. POST to `<relayEndpoint>/chunk` with JSON body (a FUND - no `request`):
       { bookingId, n, sellerTxHash, feeTxHash, priceUsd: chunkUsd, model, buyerId }
       - `bookingId` is null/absent on the first FUND, then the value the relay returns;
-        `feeTxHash` may be omitted for a dust/gas-only top-up.
+        `feeTxHash` may be omitted when feeBps is zero or for a dust/gas-only top-up.
       The relay verifies on-chain, reports the FUND, and returns
       `{ ...booking, _bookingId, remainingUsd }`. Keep `_bookingId` as `bookingId`.
 5. DRAW one or more requests against the balance (no new payment):
@@ -341,9 +341,8 @@ intents by whether an on-chain payment is attached:
 
 FUND (body has `sellerTxHash`, no `request`) - a top-up; no inference runs:
 (1) VERIFY on-chain (read-only) that `sellerTxHash` moved ≥ `priceUsd` USDC to YOUR
-    `settlementPubkey` AND (unless the price is dust/gas-only, in which case the fee
-    leg is skipped and `feeTxHash` may be absent) that `feeTxHash` moved ≥
-    `priceUsd*feeBps/10000` USDC to `feeAddress`.
+    `settlementPubkey` AND, only when feeBps is positive and the amount is non-dust,
+    that `feeTxHash` moved ≥ `priceUsd*feeBps/10000` USDC to `feeAddress`.
 (2) REPORT to the platform: POST /api/chunks/report (authenticated via x-api-key),
     body {offerId, buyerId, bookingId?, sellerTxHash, feeTxHash, priceUsd, n}. The
     platform re-verifies on-chain and credits the booking by the VERIFIED amount
@@ -477,8 +476,9 @@ returns 429 rate_limited with a retry hint in the message.
   (override with a shorter expiresInSeconds); bids default to 3600s,
   max 86400s. The offer quantity DRAINS as chunks are drawn; the offer closes at 0.
 - Payment is non-custodial and on-chain: each chunk settles in USDC on Base to the
-  seller's settlementPubkey (+ a 2.5% fee leg unless dust), verified on-chain by
-  both the seller's relay and the platform before the chunk is recorded.
+  seller's settlementPubkey (plus a fee leg only when feeBps is positive and the
+  amount is non-dust), verified on-chain by both the seller's relay and the
+  platform before the chunk is recorded.
 - Storage is in-memory with optional snapshot persistence. Do not treat
   balances here as durable.
 
