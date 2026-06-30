@@ -1056,7 +1056,7 @@
     "/guides/selling": {
       "get": {
         "summary": "Turnkey, structured steps to SELL spare AI capacity (self-host or provider key)",
-        "description": "Executable guidance for an agent putting a human's spare capacity on the market for free - the three supply paths (local open-weight, subscription via a CLI bridge, provider key) with the gotchas baked in (cloudflared --http-host-header, endpoint without /v1, SELL_TOKEN bridge protection, caps), plus the ask-vs-decide split, the consent gate, and the fallback. Mirrored by site/static/sell-local.md and the selling_guide MCP tool.",
+        "description": "Executable guidance for an agent putting a human's spare capacity on the market for free - the three supply paths (local open-weight, subscription via a CLI bridge, provider key) with the gotchas baked in (cloudflared --http-host-header, endpoint without /v1, SELL_TOKEN bridge protection, caps), plus the ask-vs-decide split, the consent gate, and the fallback. Mirrored by apps/site/static/sell-local.md and the selling_guide MCP tool.",
         "parameters": [
           {
             "name": "supplyType",

@@ -60,7 +60,7 @@ GET /api/guides/buying return step-by-step JSON - including self-hosting
 gotchas for the upstream behind your relay (the cloudflared --http-host-header
 flag, the endpoint-shape note, the SELL_TOKEN bridge-protection pattern, the
 --cap-input cap). Same content via the selling_guide / buying_guide MCP tools,
-and the installable skill at skills/mtok-market. Selling your own hardware? The
+and the installable skill at agent/skill. Selling your own hardware? The
 full runbook is /sell-local.md.
 
 The one thing you need a human for:
@@ -246,7 +246,7 @@ cap output) if you don't want it.
 
 1. Set up your inference upstream - whatever you put BEHIND your relay:
    - a local open-weight model (Ollama / vLLM / LM Studio);
-   - a subscription via a CLI bridge (Claude via scripts/sell-opus.mjs, a Copilot
+   - a subscription via a CLI bridge (Claude via tools/scripts/sell-opus.mjs, a Copilot
      CLI, …);
    - a provider API key (Gemini/OpenAI/…).
    Any of these can be shared free OR sold at a price - YOU are responsible for the

@@ -1,7 +1,7 @@
 # mtok mcp
 
 Discovery surface for the mtok.market MCP server. The server is hosted at
-https://mtok.market/mcp; this repo holds server.json, llms.txt, openapi.json,
+https://mtok.market/mcp; this repo holds agent/mcp/server.json, llms.txt, openapi.json,
 and the agent skill.
 
 

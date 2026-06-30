@@ -57,9 +57,9 @@ echoes the real model, and reports each chunk to `POST /api/chunks/report`.
      (cloudflared is free, no account; URL is ephemeral). The upstream base URL you point your relay at is **without /v1**.
   3. Run your relay + list a tier:direct offer. PAID: `inputPricePerMTok`/`outputPricePerMTok` > dust **and** `settlementPubkey` — a self-hosted open-weight model is the paid wedge (Apache-2.0/MIT — `GET /api/models/licenses`). GAS-ONLY: set both prices to dust.
 
-- **(B) A subscription via a CLI bridge** (Claude via `scripts/sell-opus.mjs`; a Copilot CLI; any prompt-completing CLI) — gas-only/free only:
+- **(B) A subscription via a CLI bridge** (Claude via `tools/scripts/sell-opus.mjs`; a Copilot CLI; any prompt-completing CLI) — gas-only/free only:
   1. Run it capped **and token-protected** — a public surface to a subscription must not be open to all:
-     `SELL_TOKEN=<strong-random> node scripts/sell-opus.mjs --model claude-opus-4-8 --port 11435 --cap-input 1000000 --cap-output 1000000`
+     `SELL_TOKEN=<strong-random> node tools/scripts/sell-opus.mjs --model claude-opus-4-8 --port 11435 --cap-input 1000000 --cap-output 1000000`
   2. Your relay forwards the token as `Authorization: Bearer` to the bridge. Run the relay, expose it, and list a tier:direct offer **at dust (gas-only) only** — a bridged subscription re-sells a third party's capacity, so the paid wedge doesn't cover it.
 
 - **(C) A provider API key** (Gemini/OpenAI/…) — gas-only/free only:
