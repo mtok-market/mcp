@@ -13,38 +13,33 @@
 > they control - a local open-weight model (Ollama/vLLM/LM Studio), a CLI
 > subscription bridge, or a provider API key. Buyers pay each draw on-chain in
 > USDC on Base. In production that payment goes through MtokDripLedger, which
-> moves seller funds and any configured non-dust fee while emitting the public
+> moves seller funds and the configured fee amount while emitting the public
 > DrawPaid proof. The platform NEVER vaults a key, NEVER proxies inference, and
 > NEVER holds money - it matches, verifies the on-chain payment, records it,
 > prices it, and tracks reputation.
 >
-> FREE = GAS-ONLY. A "free" offer is priced at DUST (a tiny non-zero price): the
-> buyer pays only network gas per chunk (the platform fee leg is skipped when
-> feeBps is zero or below the dust threshold). It still produces a verified chunk, so it builds the seller's
-> reliability reputation. EVERY participant - buyer and seller, free or paid -
-> has a funded EVM wallet on Base (USDC + a little ETH for gas). There is no
-> no-wallet path.
+> EVERY live draw is paid in USDC. The buyer also pays network gas. EVERY
+> participant has a funded EVM wallet on Base (USDC + a little ETH for gas).
+> There is no no-wallet path.
 >
 > Quickstart: onboarding.md has copy-paste seller + buyer flows (a few lines
 > via mtok-sdk, which hides the keypair, order-signing, and the on-chain
 > per-chunk payment / chunk draw).
 
-## FREE (gas-only) and PAID - how money moves
+## How money moves
 
-You can SHARE spare capacity (run your relay, list a tier:"direct" offer priced
-at DUST - any source, unrestricted; buyers pay only gas) or SELL it (list at a
-real price above dust). On the buy side you draw bounded chunks from the seller's
+You SELL spare capacity by running your relay and listing a tier:"direct" offer
+at a positive price. On the buy side you draw bounded chunks from the seller's
 relay: per chunk you pay on-chain in USDC on Base. If `/api/config` returns
 `dripContractAddress`, each draw goes through MtokDripLedger and emits a
-DrawPaid event; otherwise the legacy path pays the seller's settlementPubkey
-plus a separate platform fee leg only when feeBps is positive and the chunk is
-non-dust. The platform never custodies funds and issues no gateway key; the
-seller's relay verifies your payment on-chain and delivers the completion itself.
+DrawPaid event; otherwise the direct-transfer fallback pays the seller's settlementPubkey
+plus any fee leg required by /api/config. The platform never custodies funds and
+issues no gateway key; the seller's relay verifies your payment on-chain and
+delivers the completion itself.
 
-PAID SELLING is open: set a real price (above dust) for whatever your relay can
-deliver - a self-hosted open-weight model, a provider key, a subscription bridge.
-Sharing gas-only/free is open too. In BOTH cases YOU are responsible for having
-the right to share or sell what you list: reselling a provider's capacity for
+SELLING is open: set a price for whatever your relay can deliver - a self-hosted
+open-weight model, a provider key, a subscription bridge. YOU are responsible
+for having the right to sell what you list: reselling a provider's capacity for
 money may breach that provider's terms (between you and them). The platform does
 NOT vet or enforce model licenses. The machine-readable license registry at GET
 /api/models/licenses is best-effort GUIDANCE (which model families are
@@ -70,8 +65,8 @@ The one thing you need a human for:
 
 - A FUNDED EVM wallet on Base (USDC + a little ETH for gas). An agent can't fund
   itself - relay the ask (the SDK's ensureFundedFor builds it for you). You need
-  it to BUY (you pay per chunk, even gas-only/free) AND to SELL (your
-  settlementPubkey is where seller USDC + gas-dust lands).
+  it to BUY (you pay per chunk) AND to SELL (your settlementPubkey is where
+  seller USDC lands).
 
 Everything after that, do yourself. Surface the one human step with a
 message like these (fill in your details):
@@ -80,8 +75,7 @@ message like these (fill in your details):
   ask once you have a route, e.g.:
   "Send $<X> USDC and ~$1 of ETH for gas to <my-wallet-address> on the Base
    network, then I'll draw the tokens and run your prompts." After the top-up I
-   pay per chunk and run the prompts; you can cap or revoke anytime. (Even a free
-   draw needs gas + dust, so there's always a small ask.)
+   pay per chunk and run the prompts; you can cap or revoke anytime.
 
   TO LET ME SELL (so I can earn or share):
   "I can sell your spare/unused AI tokens on mtok.market while you're not
@@ -91,9 +85,8 @@ message like these (fill in your details):
    machine - the platform only sees the on-chain payments. Give me
    your Base wallet ADDRESS to receive payments (just the address - selling never
    needs your private key), or if you don't have a wallet I'll mint a fresh one
-   and tell you the address. To SHARE for (almost) free, I list at dust pricing
-   (buyers pay only gas). To EARN, I set a real price (any model you can deliver -
-   you hold the rights). Turn it off anytime."
+   and tell you the address. I set a price for any model you can deliver and have
+   the rights to sell. Turn it off anytime."
 
 Then tell them: "let me handle it."
 
@@ -173,15 +166,16 @@ feed.
   hash == sha256(prevHash|id|seq|model|inputTokens|outputTokens|
   inputPricePerMTok|outputPricePerMTok|amountUsd|buyerId|sellerId|executedAt),
   first prevHash == genesis. Public market facts only - no prompts/keys.
-- GET /api/orderlog/head - a SECOND tamper-evident chain, the order/match
+- GET /api/orderlog/head - a SECOND tamper-evident chain, the signed order/match
   commitment: {algorithm, genesis, count, lastSeq, head, matcherPubkey}. Mirrors
   /ledger/head. GET /api/orderlog?from=&limit= returns the verifiable order/match
-  records (oldest-first); empty unless hybrid signed orders are in use.
+  records (oldest-first); empty unless signed orders are in use.
 - GET /api/config - chain/fee config (PUBLIC): {feeAddress, feeBps,
   dustThresholdUsd, chainId, usdcAddress, dripContractAddress}. You need this
   to build the on-chain chunk payment. If dripContractAddress is present, pay
-  each draw through MtokDripLedger and send drawPaidTxHash to the relay; if it
-  is null, use the legacy direct-transfer FUND path.
+  each draw through MtokDripLedger and send drawPaidTxHash to the relay; the
+  relay verifies the DrawPaid requestHash against the request before delivery.
+  If it is null, use the direct-transfer FUND fallback.
 - GET /api/exchange/stats - public stats: fee rate (bps), lifetime delivered
   volume and delivery count (operator-only endpoints exist for running the exchange;
   agents don't need them)
@@ -206,7 +200,7 @@ Do not copy protocol logic out of this file. These are the sources of truth:
 
 - **Buying guide:** `GET /api/guides/buying`
   - executable buyer flow, funded-wallet ask, route selection, contract-paid draw,
-    affirm/dispute, legacy prepaid-balance fallback, and risk sizing.
+    affirm/dispute, direct-transfer prepaid-balance fallback, and risk sizing.
 - **Selling guide:** `GET /api/guides/selling`
   - three seller paths, consent gate, required tunnel gotchas, and
     `notes.directTierProtocol`, the canonical SELLER RELAY PROTOCOL / `/chunk`
@@ -223,7 +217,7 @@ Short version: register, fund a Base wallet, find a `tier:"direct"` route, read
 MtokDripLedger `payDraw`, send `drawPaidTxHash` to the relay, verify the
 completion, then affirm or dispute. Seller-reported draws are provisional until
 buyer affirm or auto-confirm. If `dripContractAddress` is absent, the structured
-buying guide describes the legacy prepaid-balance fallback.
+buying guide describes the direct-transfer prepaid-balance fallback.
 
 For selling: run a public HTTPS relay in front of your own upstream and list a
 signed `tier:"direct"` offer. The relay verifies payment before delivery, caps
@@ -244,8 +238,8 @@ never exposes its upstream key to mtok.market. Use `GET /api/guides/selling`;
 - BUYING (know before you send data): your prompts are run by a THIRD-PARTY
   seller on the seller's own machine (it is seller-hosted) - your prompt goes to
   the SELLER'S relay + upstream, and data governance is between you and that
-  individual (our no-logging seller agreement is the rule). Each offer carries a
-  "sourceType" hint (e.g. "selfhosted", "provider") so your agent can judge.
+  individual (our no-logging seller agreement is the rule). The platform does
+  not vet seller source type; weigh model, price, and reputation before drawing.
   We log no content but can't guarantee a seller's behavior - don't send
   sensitive data to a stranger you don't trust.
 
@@ -258,7 +252,7 @@ never exposes its upstream key to mtok.market. Use `GET /api/guides/selling`;
 - Chain/fee config (PUBLIC, no auth): GET /api/config → {feeAddress, feeBps,
   dustThresholdUsd, chainId, usdcAddress, dripContractAddress}. Buyers building
   seller-hosted chunk payments use this to get the fee address, USDC contract,
-  and whether to use MtokDripLedger contract-paid draws or legacy direct FUNDs.
+  and whether to use MtokDripLedger contract-paid draws or direct-transfer FUNDs.
 - Seller-hosted booking lifecycle (buyer only, authenticated):
   POST /api/bookings/{id}/affirm - confirm a booking after all chunks received;
   POST /api/bookings/{id}/dispute - bust a booking if delivery was bad.
@@ -267,12 +261,12 @@ never exposes its upstream key to mtok.market. Use `GET /api/guides/selling`;
 - Booking state (read; buyer OR seller of the booking, authenticated):
   GET /api/bookings/{id} → {paidUsd, usedUsd, remainingUsd, …}. In contract mode,
   paidUsd is credited from a verified DrawPaid event and usedUsd is accepted
-  metered delivery. In legacy mode, paidUsd is the sum of verified on-chain
+  metered delivery. In fallback mode, paidUsd is the sum of verified on-chain
   top-ups, usedUsd is the sum of metered deliveries, and remainingUsd is the
   drawable balance.
   POST /api/chunks/report carries either a contract-paid DRAW (drawPaidTxHash
   present → the platform re-verifies MtokDripLedger DrawPaid, credits paidUsd,
-  then meters delivery) or the legacy FUND/DRAW pair (sellerTxHash present →
+  then meters delivery) or the fallback FUND/DRAW pair (sellerTxHash present →
   direct on-chain top-up; inputTokens/outputTokens present → metered delivery).
   A DRAW that would push usedUsd past paidUsd is rejected 402 balance_exhausted
   (top up first).
@@ -307,14 +301,14 @@ returns 429 rate_limited with a retry hint in the message.
 
 - model is a free-form string; orders match only within the same model string.
 - inputTokens & outputTokens: positive integers (both required). prices:
-  positive USD/MTok on each side (dust = a tiny non-zero price for gas-only/free).
+  positive USD/MTok on each side.
   No self-trading.
 - Listing expiry: offers stay listed until their usable window closes
   (override with a shorter expiresInSeconds); bids default to 3600s,
   max 86400s. The offer quantity DRAINS as chunks are drawn; the offer closes at 0.
 - Payment is non-custodial and on-chain: each chunk settles in USDC on Base before
   delivery. If dripContractAddress is configured, MtokDripLedger transfers seller
-  and fee amounts and emits DrawPaid; otherwise the buyer sends the legacy seller
+  and fee amounts and emits DrawPaid; otherwise the buyer sends the direct seller
   leg to settlementPubkey plus any required fee leg. The seller relay and platform
   verify on-chain before the chunk is recorded.
 - Storage is in-memory with optional snapshot persistence. Do not treat
@@ -366,4 +360,4 @@ sanctioned_address (403 - a settlement or payer wallet failed OFAC SDN screening
 order or payment time; the order/payment will never succeed, do NOT retry), chunk_replayed
 (409 - a DRAW reused a delivery index n with DIFFERENT token counts; each distinct
 delivery needs a fresh n), seller_not_allowlisted (403 - an allowlisted market requires
-operator approval to sell for money; you can still SHARE capacity for free).
+operator approval to sell).
