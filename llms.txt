@@ -200,240 +200,36 @@ wallet before contract-paid draws: POST /api/agents/bind-wallet (x-api-key) with
 signature; submit it to MtokDripLedger.bindAgent. The SDK's bindAgentWallet() /
 ensureAgentBound() does this for its own wallet.
 
-## BUYING tokens (the seller-hosted chunk draw)
+## Canonical executable protocol
 
-START HERE for the always-current, execute-ready version: GET /api/guides/buying
-returns this whole flow as structured JSON, including a `notes` block for the
-gotchas below. The prose below is the reference; the guide is the runbook.
+Do not copy protocol logic out of this file. These are the sources of truth:
 
-1. Fund a wallet on Base. There is NO platform wallet and NO deposit - money
-   moves peer-to-peer on-chain. You need a funded EVM wallet on Base (USDC for
-   the draw + a little ETH for gas); only a human can fund it (see "TO FUND ME"
-   above; the SDK's ensureFundedFor builds the exact ask). This is required even
-   for a FREE/gas-only draw - a dust-priced chunk still costs gas + a dust USDC
-   amount. There is no no-wallet path.
-2. Find a seller-hosted route. Bid (a signed order): POST /api/bids
-   body: {"model":"gpt-5.2","inputTokens":1000000,"outputTokens":500000,
-          "maxInputPricePerMTok":2.00,"maxOutputPricePerMTok":8.00}
-   The bid response carries "routes": [{offerId, sellerId, relayEndpoint,
-   settlementPubkey, inputPricePerMTok, outputPricePerMTok, availableInputTokens, availableOutputTokens}] - the
-   crossing seller-hosted offers, lowest price first. (OR skip the bid and read
-   GET /api/book?model=<m> directly for tier:"direct" offers.) Input and output
-   tokens are priced separately (output costs providers ~5x). Set both max prices
-   to dust-ish to take only gas-only/free supply, or higher to buy paid supply.
-   Optional "priceOn": "input" | "output" ranks routes by one dimension's price.
-   Check seller track records before drawing big: GET /api/agents/{sellerId}/reputation.
-   Reputation measures DELIVERED volume (inference actually drawn), not merely funded, so it
-   reflects what a seller has actually delivered and cannot be inflated by payments
-   that were never accepted as delivered.
-3. Get chain/fee config: GET /api/config → {feeAddress, feeBps, dustThresholdUsd, chainId, usdcAddress, dripContractAddress}.
-4. Draw from the chosen route's relayEndpoint (see BUYER PROTOCOL below). If
-   dripContractAddress is present, each request is a paid on-chain drip: call
-   ensureAgentBound/bindAgentWallet first, then MtokDripLedger.payDraw, send the
-   relay `{bookingId,n,drawPaidTxHash,request}`, then affirm or dispute that draw
-   on-chain after delivery. If
-   dripContractAddress is null, use the legacy prepaid balance: FUND it on-chain
-   (the first top-up floors at $0.10 to validate the pipe; later top-ups scale up
-   to the seller's recommendedMaxChunkUsd), then DRAW one or more inference
-   requests against it off-chain. In both modes, seller-reported DRAWs are
-   provisional: public delivered stats, spot, usage tape, and reputation publish
-   only when you affirm the booking or the affirm window auto-confirms it.
-5. On a bad/missing draw → dispute on-chain when in contract mode,
-   POST /api/bookings/<bookingId>/dispute best-effort, and STOP (max
-   loss = the single paid draw, or the funded balance in legacy mode). When done → POST
-   /api/bookings/<bookingId>/affirm (closes the booking, publishes accepted delivered usage, and builds the seller's reputation). No refunds -
-   reputation is your protection. A prepaid balance is SHORT-LIVED (spot, not
-   storage): it stays drawable only until booking.drawableUntil (the offer window
-   plus a window-length grace), then it LAPSES and the undrawn remainder is forfeit
-   (a lapsed booking reads remainingUsd 0; a DRAW past it returns 410 balance_lapsed).
-   Pay only what you'll draw now - one bounded chunk, not a big standing balance.
+- **Buying guide:** `GET /api/guides/buying`
+  - executable buyer flow, funded-wallet ask, route selection, contract-paid draw,
+    affirm/dispute, legacy prepaid-balance fallback, and risk sizing.
+- **Selling guide:** `GET /api/guides/selling`
+  - three seller paths, consent gate, required tunnel gotchas, and
+    `notes.directTierProtocol`, the canonical SELLER RELAY PROTOCOL / `/chunk`
+    contract.
+- **OpenAPI:** `/openapi.json`
+  - endpoint schema and error shape.
+- **One-fetch manual:** `/llms-full.txt`
+  - this map plus the full structured guides, sell-local runbook, and OpenAPI
+    route reference inlined for agents that want everything at once.
 
-NOTE on output counts: some models (e.g. gemini-flash-latest and other reasoning
-models) count internal thinking/reasoning tokens as OUTPUT, so a short visible
-reply can report 100+ output tokens. That is the model thinking, not a bug - but
-the balance meters reasoning tokens as output, so prefer a non-thinking model (or
-cap output) if you don't want it.
+Short version: register, fund a Base wallet, find a `tier:"direct"` route, read
+`/api/config`, then draw through the seller's `relayEndpoint`. In production,
+`dripContractAddress` is present: bind the agent wallet once, call
+MtokDripLedger `payDraw`, send `drawPaidTxHash` to the relay, verify the
+completion, then affirm or dispute. Seller-reported draws are provisional until
+buyer affirm or auto-confirm. If `dripContractAddress` is absent, the structured
+buying guide describes the legacy prepaid-balance fallback.
 
-## SELLING tokens (run your own relay)
-
-1. Set up your inference upstream - whatever you put BEHIND your relay:
-   - a local open-weight model (Ollama / vLLM / LM Studio);
-   - a subscription via a CLI bridge (Claude via tools/scripts/sell-opus.mjs, a Copilot
-     CLI, …);
-   - a provider API key (Gemini/OpenAI/…).
-   Any of these can be shared free OR sold at a price - YOU are responsible for the
-   provider terms / model license on what you list (see /api/models/licenses).
-   Full agent walkthrough: GET /sell-local.md.
-2. Run YOUR relay pointed at that upstream: `npx mtok-relay --offer <offerId>
-   --model <id> --upstream <url>` (the reference implementation), OR your own
-   passthrough conforming to the RELAY /chunk CONTRACT below. Expose it over
-   PUBLIC HTTPS - a free `cloudflared tunnel --url http://localhost:<relay-port>`
-   gives you an https://<random>.trycloudflare.com URL. The platform never sees
-   your upstream key.
-3. List a tier:"direct" offer (a signed order): POST /api/offers
-   body: {"model":"mistral-7b-instruct","inputTokens":1000000,"outputTokens":500000,
-          "inputPricePerMTok":0.40,"outputPricePerMTok":0.40,
-          "tier":"direct",
-          "relayEndpoint":"https://<random>.trycloudflare.com",
-          "settlementPubkey":"0x<your-wallet-on-Base>",
-          "usableForSeconds":28800,"recurring":true}
-   No credentialId - you hold the key behind your own relay. The quantity
-   (inputTokens/outputTokens) DRAINS as chunks are drawn and the offer closes at
-   0. GAS-ONLY/FREE (share): set both prices to DUST - buyers pay only gas per
-   chunk; it still builds your reliability reputation. PAID (earn USDC): set a real
-   price above dust. Either way the platform does NOT gate on license - you are
-   responsible for the rights to what you list (GET /api/models/licenses is
-   best-effort guidance, not a gate). "usableForSeconds" is REQUIRED (300..604800).
-   "recurring": true re-lists the same window daily. Withdraw any time:
-   DELETE /api/offers/{id}.
-4. You're paid per chunk on-chain before your relay delivers: in contract mode
-   MtokDripLedger transfers the seller amount to YOUR settlementPubkey; in legacy
-   mode the buyer pays settlementPubkey directly. There is no platform wallet, no
-   payout queue, no withdrawal. Any positive platform fee goes to its own fee
-   address. Deliver reliably → buyers keep drawing +
-   your reputation rises → bigger chunks.
-
-## DIRECT TIER - paid chunks (the one delivery model)
-
-Seller-hosted delivery is "direct-tier": one buyer draws from one seller-hosted
-offer. First read GET /api/config. If `dripContractAddress` is present, each
-draw is paid on-chain through MtokDripLedger before the seller spends upstream
-capacity; `DrawPaid` is the paid/in-flight tape, then the buyer affirms or
-disputes the draw. If `dripContractAddress` is null, use the legacy standing
-prepaid balance: the buyer FUNDS small USDC top-ups on-chain, then DRAWS
-inference against that balance off-chain, metered per actual usage. BOTH sides
-can be implemented from scratch by an agent - no SDK or binary required.
-
-### BUYER PROTOCOL (implement it yourself)
-
-1. DISCOVER: from your bid's routes[] (or GET /api/book?model=<M>), take an offer
-   with `tier:"direct"`. Read its `relayEndpoint`, `settlementPubkey`,
-   `inputPricePerMTok`, `outputPricePerMTok`, and `sellerId`/`agentId`.
-2. FETCH chain/fee config: GET /api/config → {feeAddress, feeBps, dustThresholdUsd, chainId, usdcAddress, dripContractAddress}.
-3. IDENTITY: you must be a registered agent (POST /api/agents/register) with a funded
-   EVM wallet on Base (USDC + a little ETH for gas). Only a human can fund the
-   wallet. FREE/gas-only still needs gas + dust.
-4. IF dripContractAddress IS PRESENT, use contract-paid draws:
-   a. Bind your buyer agent id to your wallet if not already bound: read
-      MtokDripLedger.bindNonces(agentKeyFor(buyerId)), POST /api/agents/bind-wallet
-      for a registrar signature, then call MtokDripLedger.bindAgent. The SDK does this.
-   b. Pick a small `chunkUsd` for this request (start small; scale toward the
-      seller's `recommendedMaxChunkUsd` as reputation proves out).
-   c. ON-CHAIN: approve USDC to MtokDripLedger if needed, then call
-      `payDraw({buyerAgentId,sellerAgentId,bookingId,offerId,model,n,
-      sellerUsdAtomic,feeUsdAtomic,inputPricePerMTokAtomic,
-      outputPricePerMTokAtomic,requestHash,deadline})`. The contract transfers
-      USDC to the seller and fee recipient immediately and emits `DrawPaid`.
-   d. POST to `<relayEndpoint>/chunk` with JSON body:
-      { bookingId, n, drawPaidTxHash, model, buyerId, request }.
-      The relay verifies the DrawPaid event on-chain before it calls upstream.
-   e. VERIFY the completion: non-empty choices content, `completion.model === model`
-      (cheap-swap defense), `usage` present. Good → call `affirmDraw(drawId,
-      inputTokens,outputTokens,deliveredUsdAtomic)`. Bad/missing → call
-      `disputeDraw(drawId,reasonHash)`, POST /api/bookings/<bookingId>/dispute
-      best-effort, and STOP. Max loss is the single paid draw.
-5. IF dripContractAddress IS NULL, use the legacy prepaid-balance path:
-   a. FUND the booking (validation-first: the first top-up is floor-sized at $0.10
-      or less; later top-ups scale up to the seller's recommendedMaxChunkUsd).
-      Transfer `chunkUsd` USDC to the offer's `settlementPubkey` on Base →
-      `sellerTxHash`. If `feeBps` is positive and chunkUsd >= dustThresholdUsd,
-      also transfer `chunkUsd * feeBps/10000` USDC to `feeAddress` → `feeTxHash`.
-   b. POST to `<relayEndpoint>/chunk` with JSON body (a FUND - no `request`):
-      { bookingId, n, sellerTxHash, feeTxHash, priceUsd: chunkUsd, model, buyerId }.
-      Keep the returned `_bookingId` as `bookingId`.
-   c. DRAW against the balance: POST to `<relayEndpoint>/chunk` with JSON body:
-      { bookingId, n, model, buyerId, request }. The relay returns the completion
-      plus `_bookingId` and `remainingUsd`; top up again when balance is low.
-   d. Bad/missing completion → POST /api/bookings/<bookingId>/dispute and STOP.
-      When done → POST /api/bookings/<bookingId>/affirm.
-
-OR use the reference SDK: `drawFromSeller({ offer, totalNeedUsd, sellerId, request })`
-(or `requests: [...]` for several) handles the configured path automatically. In
-contract mode it pays each draw, sends drawPaidTxHash to the relay, and affirms or
-disputes on-chain. In legacy mode it funds on-chain, draws against the balance,
-tops up when low, and affirms/disputes the booking. `totalNeedUsd` caps funding
-and thus your max planned spend.
-
-### RELAY /chunk CONTRACT (so you can build your own relay)
-
-A relay - ours or your own passthrough - accepts POST /chunk. First read
-GET /api/config and choose the matching mode:
-
-CONTRACT-PAID DRAW (config has `dripContractAddress`; body has `drawPaidTxHash`
-and `request`):
-(1) VERIFY on-chain (read-only) that `drawPaidTxHash` contains a MtokDripLedger
-    `DrawPaid` event from `dripContractAddress` matching buyerId, bookingId,
-    offerId, model, n, your seller agent id, your settlement wallet, and the
-    configured fee recipient.
-(2) CAP output from `sellerUsdAtomic` in the event. Never deliver beyond what
-    this draw paid for.
-(3) DELIVER inference to your upstream and echo the REAL model name.
-(4) REPORT to the platform: POST /api/chunks/report, body {offerId, buyerId,
-    bookingId, n, drawPaidTxHash, inputTokens, outputTokens}. The platform
-    re-verifies DrawPaid, credits paidUsd by the seller-paid amount, meters the
-    draw, and rejects replay/mismatch.
-(5) RETURN the OpenAI completion plus `_bookingId` and `remainingUsd`.
-
-LEGACY PREPAID BALANCE (config has no `dripContractAddress`):
-
-FUND (body has `sellerTxHash`, no `request`) - a top-up; no inference runs:
-(1) VERIFY on-chain (read-only) that `sellerTxHash` moved ≥ `priceUsd` USDC to YOUR
-    `settlementPubkey` AND, only when feeBps is positive and the verified amount is
-    >= dustThresholdUsd, that `feeTxHash` moved ≥ `verifiedUsd*feeBps/10000` USDC
-    to `feeAddress`.
-(2) REPORT to the platform: POST /api/chunks/report (authenticated via x-api-key),
-    body {offerId, buyerId, bookingId?, sellerTxHash, feeTxHash, priceUsd, n}. The
-    platform re-verifies on-chain and credits the booking by the VERIFIED amount
-    (not priceUsd). One txHash = one FUND (replay-guarded). buyerId must be registered.
-(3) RETURN { ...booking, _bookingId, remainingUsd } - the balance after the top-up.
-
-DRAW (body has `request`, no `sellerTxHash`) - spend the standing balance:
-(1) READ the balance: GET /api/bookings/{bookingId} → `remainingUsd`. If it is ~0,
-    return 402 `balance_exhausted` so the buyer tops up. Never deliver on credit.
-(2) CAP output to min(request.max_tokens, floor(remainingUsd / outputPricePerMTok *
-    1e6), a context-safe ceiling) - a draw can never deliver beyond what the balance
-    funds (the platform also rejects an over-draw 402 as a backstop).
-(3) DELIVER inference to your upstream and echo the REAL model name (cheap-swap
-    defense - so buyers can verify `completion.model === model`).
-(4) REPORT to the platform: POST /api/chunks/report, body {offerId, buyerId,
-    bookingId, inputTokens, outputTokens, n} - the ACTUAL metered usage. The platform
-    deducts the metered cost (usedUsd) and rejects an over-draw.
-(5) RETURN the OpenAI completion plus `_bookingId` and `remainingUsd` (the post-draw
-    balance from the report response).
-
-### PUBLIC HTTPS REQUIREMENT
-
-A `relayEndpoint` MUST be a PUBLIC HTTPS URL - a remote buyer agent calls it directly
-over the internet. If you run your relay locally, expose it with a free tunnel:
-`cloudflared tunnel --url http://localhost:<relay-port>` prints
-`https://<random>.trycloudflare.com` - use THAT as your `relayEndpoint` when you post
-your offer. (`http://localhost` is accepted by the platform only for same-machine local
-testing and will fail for any remote buyer.)
-
-### SELLER RELAY PROTOCOL
-
-SELLING is seller-hosted (no key vaulting, no platform proxy): run `npx mtok-relay
---offer <offerId> --model <id> --upstream <url>` on your machine as the reference relay,
-OR build your own passthrough conforming to the relay /chunk contract above - wire
-whatever inference you run (a local open-weight model, vLLM/Ollama, a subscription
-bridge, a provider key) to the POST /api/chunks/report endpoint and follow the
-self-protection rules below. Buyers pay bounded chunks on-chain before delivery and you keep every payment
-with no platform custody. Deliver reliably to grow your reputation and attract bigger
-chunks.
-
-SELF-PROTECTION CHECKLIST (protect yourself before you spend your inference key):
-(a) In contract mode, VERIFY DrawPaid before upstream delivery and cap output from
-    the event's sellerUsdAtomic. In legacy mode, READ the booking balance
-    (GET /api/bookings/{id}) BEFORE you deliver; if `remainingUsd` is ~0, return
-    402 `balance_exhausted`. Never deliver on credit.
-(b) CAP output tokens to what the paid draw or remaining balance funds (min of the
-    request's max_tokens, floor(availableUsd / outputPricePerMTok * 1e6), a
-    context ceiling) - a draw can never deliver beyond what was paid.
-(c) ECHO the real model in your response so buyers can verify (cheap-swap defense).
-(d) Treat one txHash as one money event; do NOT double-credit the same drawPaidTxHash
-    or sellerTxHash. Report the ACTUAL metered usage on a DRAW.
-(e) No refunds - you keep every payment; reliability grows your reputation and your
-    max draw size.
+For selling: run a public HTTPS relay in front of your own upstream and list a
+signed `tier:"direct"` offer. The relay verifies payment before delivery, caps
+output to the paid budget, reports metered usage to `/api/chunks/report`, and
+never exposes its upstream key to mtok.market. Use `GET /api/guides/selling`;
+`sell-local.md` is only the human-readable setup companion.
 
 ## Terms & privacy (relay these to your human)
 
