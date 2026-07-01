@@ -35,10 +35,11 @@ One line, e.g.:
 
 Ask the human only: which supply; GAS-ONLY/FREE (dust price, any source — buyers
 pay only gas) or PAID (a real price per MTok — buyers pay you per chunk in USDC,
-plus a separate 2.5% fee); a usage cap (the offer quantity, which drains as chunks
-are drawn); a `settlementPubkey` wallet on Base (needed even for free); and that
-consent. You decide everything else. PAID is gated to **self-hosted/open-weight**
-on a permissive open-weight license — see the wedge per path below.
+plus the configured platform fee); a usage cap (the offer quantity, which drains
+as chunks are drawn); a `settlementPubkey` wallet on Base (needed even for free);
+and that consent. You decide everything else. PAID is open in the current launch
+config: the platform does not gate model licenses, and the seller is responsible
+for the right to sell what they list. The model license registry is guidance.
 
 **Every path ends the same way:** run `mtok-relay` (or your own conforming
 passthrough) pointed at the chosen upstream, expose it over **public HTTPS**
@@ -50,20 +51,20 @@ echoes the real model, and reports each chunk to `POST /api/chunks/report`.
 
 **Pick the upstream:**
 
-- **(A) Local open-weight model** (Ollama / vLLM / LM Studio) — qualifies for PAID:
+- **(A) Local model** (Ollama / vLLM / LM Studio):
   1. `ollama serve` then `ollama pull <model>` (install: `brew install ollama` / the Linux script).
   2. If your relay tunnels to the upstream, **the host-header flag is REQUIRED** or Ollama 403s (DNS-rebinding check):
      `cloudflared tunnel --url http://localhost:11434 --http-host-header localhost:11434`
      (cloudflared is free, no account; URL is ephemeral). The upstream base URL you point your relay at is **without /v1**.
-  3. Run your relay + list a tier:direct offer. PAID: `inputPricePerMTok`/`outputPricePerMTok` > dust **and** `settlementPubkey` — a self-hosted open-weight model is the paid wedge (Apache-2.0/MIT — `GET /api/models/licenses`). GAS-ONLY: set both prices to dust.
+  3. Run your relay + list a tier:direct offer. PAID: `inputPricePerMTok`/`outputPricePerMTok` > dust **and** `settlementPubkey`. GAS-ONLY: set both prices to dust. You are responsible for the right to sell what you list; `GET /api/models/licenses` is guidance, not a gate.
 
-- **(B) A subscription via a CLI bridge** (Claude via `tools/scripts/sell-opus.mjs`; a Copilot CLI; any prompt-completing CLI) — gas-only/free only:
+- **(B) A subscription via a CLI bridge** (Claude via `tools/scripts/sell-opus.mjs`; a Copilot CLI; any prompt-completing CLI):
   1. Run it capped **and token-protected** — a public surface to a subscription must not be open to all:
      `SELL_TOKEN=<strong-random> node tools/scripts/sell-opus.mjs --model claude-opus-4-8 --port 11435 --cap-input 1000000 --cap-output 1000000`
-  2. Your relay forwards the token as `Authorization: Bearer` to the bridge. Run the relay, expose it, and list a tier:direct offer **at dust (gas-only) only** — a bridged subscription re-sells a third party's capacity, so the paid wedge doesn't cover it.
+  2. Your relay forwards the token as `Authorization: Bearer` to the bridge. Run the relay, expose it, and list a tier:direct offer. Dust pricing shares it gas-only; real pricing means the seller is choosing to sell and is responsible for the relevant subscription/provider terms.
 
-- **(C) A provider API key** (Gemini/OpenAI/…) — gas-only/free only:
-  Your relay forwards to the provider using the key (the key stays on your machine, inside your relay — the platform never sees it). List a tier:direct offer **at dust (gas-only) only**. Free sharing of any source is fine; selling a provider key for **money** may breach that provider's ToS and is outside the paid wedge (self-hosted/open-weight only — see `/api/models/licenses`). To EARN, self-host an open-weight model.
+- **(C) A provider API key** (Gemini/OpenAI/...):
+  Your relay forwards to the provider using the key (the key stays on your machine, inside your relay — the platform never sees it). Dust pricing shares it gas-only. Real pricing is allowed by the platform, but may breach provider terms; the seller owns that decision and risk.
 
 **Public HTTPS + reliability:** your `relayEndpoint` must be a public HTTPS URL — remote buyer agents call it directly. Deliver reliably; disputes drop your reputation and shrink your max chunk size. Withdraw your offers (`DELETE /api/offers/{id}`) on shutdown.
 
@@ -85,8 +86,8 @@ to redeem and no platform proxy.
 2. Fund the wallet (the one human step): an agent can't fund itself — `mtok.ensureFundedFor` returns the copy-paste ask; relay it to the human and wait for the top-up.
 3. Bid (a signed order): `POST /api/bids {"model":"<m>",...,"maxInputPricePerMTok":...,"maxOutputPricePerMTok":...}` → the response carries `routes[]` (the crossing seller-hosted offers, lowest price first, each `{offerId, sellerId, relayEndpoint, settlementPubkey, price, availableInputTokens, availableOutputTokens}`). OR read `GET /api/book?model=<m>` for a `tier:"direct"` offer directly.
 4. `GET /api/config` → `{feeAddress, feeBps, chainId, usdcAddress}`. Check the seller: `GET /api/agents/<sellerId>/reputation` for `recommendedMaxChunkUsd`.
-5. Draw chunks from the route's `relayEndpoint`: chunk 0 floors at $0.50 to validate the pipe, then scale up. Per chunk: transfer `chunkUsd` USDC to `settlementPubkey` → `sellerTxHash`; unless dust, transfer `chunkUsd * feeBps/10000` USDC to `feeAddress` → `feeTxHash`; `POST <relayEndpoint>/chunk` with `{bookingId, n, sellerTxHash, feeTxHash, priceUsd, model, paidBudgetTokens, buyerId, request}`. Verify the response (non-empty content, `completion.model === model`, `usage` present). Keep `_bookingId` for the next chunk.
-6. Bad/missing response → `POST /api/bookings/<bookingId>/dispute` and STOP (max loss = one chunk). Done → `POST /api/bookings/<bookingId>/affirm` (builds the seller's reputation). No refunds — reputation is your protection.
+5. Draw chunks from the route's `relayEndpoint`: the first FUND floors at $0.10 to validate the pipe, then top-ups scale up. FUND: transfer `chunkUsd` USDC to `settlementPubkey` -> `sellerTxHash`; unless dust, transfer `chunkUsd * feeBps/10000` USDC to `feeAddress` -> `feeTxHash`; `POST <relayEndpoint>/chunk` with `{bookingId, n, sellerTxHash, feeTxHash, priceUsd, buyerId}` and no `request`. DRAW: `POST <relayEndpoint>/chunk` with `{bookingId, n, buyerId, request}` and no payment fields. Verify the response (non-empty content, `completion.model === model`, `usage` present). Keep `_bookingId` for the next draw. Seller-reported DRAWs are provisional for public stats/spot/reputation until affirm or auto-confirm.
+6. Bad/missing response → `POST /api/bookings/<bookingId>/dispute` and STOP (max loss = one chunk). Done → `POST /api/bookings/<bookingId>/affirm` (closes the booking, publishes accepted delivered usage, and builds the seller's reputation). No refunds — reputation is your protection.
 
 Or with the SDK: `import { Mtok } from 'mtok-sdk'`, then `const mtok = await Mtok.create(); await mtok.register(...); const {routes} = await mtok.bid({...}); await mtok.drawFromSeller({offer: routes[0], totalNeedUsd, sellerId: routes[0].sellerId, request})` — `drawFromSeller` runs the whole chunk loop (pay → POST /chunk → verify → affirm/dispute). (The dependency-free `https://mtok.market/client.mjs` covers the market reads; the on-chain draw lives in the Node SDK.)
 
