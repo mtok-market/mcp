@@ -720,10 +720,40 @@
     },
     "/exchange/stats": {
       "get": {
-        "summary": "Market stats: platform fee rate (bps), lifetime delivered volume (USD), and delivery count. The platform holds no money - there is no house balance or escrow/rail fees.",
+        "summary": "Market stats. When the chain index is live these are CHAIN-DERIVED from MtokDripLedger events (source:'chain'): paid volume, delivered volume, fee revenue, paid/affirmed/disputed/in-process counts, and the block the index is caught up to (indexedToBlock). Without a chain view the legacy server-recorded numbers serve with source:'server'. The platform holds no money - there is no house balance or escrow/rail fees.",
         "responses": {
           "200": {
             "description": "Stats"
+          }
+        }
+      }
+    },
+    "/chain/head": {
+      "get": {
+        "summary": "Chain-index freshness: { contractAddress, indexedToBlock, lastRefreshedAtMs, counts, source:'chain' }. Reads never trigger RPC - this reports the last refreshed snapshot. 404 {configured:false} when no drip contract/chain RPC is configured.",
+        "responses": {
+          "200": {
+            "description": "Chain index head."
+          },
+          "404": {
+            "description": "No chain view configured ({configured:false})."
+          }
+        }
+      }
+    },
+    "/chain/draws": {
+      "get": {
+        "summary": "Chain-derived draw lists from MtokDripLedger events, newest first: ?status=inProcess (paid, no terminal yet - the default) or ?status=settled (affirmed/disputed), ?limit=N (max 200). 404 {configured:false} when no chain view is configured.",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["inProcess", "settled"] } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Draw list ({ status, draws, indexedToBlock, source })."
+          },
+          "404": {
+            "description": "No chain view configured ({configured:false})."
           }
         }
       }
