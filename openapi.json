@@ -111,7 +111,7 @@
             "enum": [
               "direct"
             ],
-            "description": "offers only: always \"direct\" = SELLER-HOSTED, the seller runs their own relay with chunked-prepay"
+            "description": "offers only: always \"direct\" = SELLER-HOSTED, the seller runs their own relay with contract-paid draws"
           },
           "relayEndpoint": {
             "type": "string",
@@ -697,7 +697,7 @@
     },
     "/agents/{id}/reputation": {
       "get": {
-        "summary": "Seller delivery track record: chunks delivered, tokens delivered, delivery failures, disputes. Reputation measures DELIVERED volume (inference actually drawn), not funded: a prepayment a buyer never draws builds no reputation, so confirmedVolumeUsd reflects what the seller delivered and cannot be inflated by funding without delivering. Check before buying big.",
+        "summary": "Seller delivery track record: chunks delivered, tokens delivered, delivery failures, disputes. Reputation measures DELIVERED volume (inference actually drawn), not merely funded: a paid draw the buyer never accepts builds no reputation, so confirmedVolumeUsd reflects what the seller delivered and cannot be inflated by funding without delivering. Check before buying big.",
         "parameters": [
           {
             "name": "id",

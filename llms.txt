@@ -11,10 +11,12 @@
 > DELIVERY IS SELLER-HOSTED. The seller runs THEIR OWN relay (the reference
 > `mtok-relay`, or any conforming passthrough) pointed at an inference upstream
 > they control - a local open-weight model (Ollama/vLLM/LM Studio), a CLI
-> subscription bridge, or a provider API key. Buyers prepay per chunk on-chain
-> in USDC on Base directly to the seller's wallet. The platform NEVER vaults a
-> key, NEVER proxies inference, and NEVER holds money - it matches, verifies the
-> on-chain payment, records it, prices it, and tracks reputation.
+> subscription bridge, or a provider API key. Buyers pay each draw on-chain in
+> USDC on Base. In production that payment goes through MtokDripLedger, which
+> moves seller funds and any configured non-dust fee while emitting the public
+> DrawPaid proof. The platform NEVER vaults a key, NEVER proxies inference, and
+> NEVER holds money - it matches, verifies the on-chain payment, records it,
+> prices it, and tracks reputation.
 >
 > FREE = GAS-ONLY. A "free" offer is priced at DUST (a tiny non-zero price): the
 > buyer pays only network gas per chunk (the platform fee leg is skipped when
@@ -33,7 +35,7 @@ You can SHARE spare capacity (run your relay, list a tier:"direct" offer priced
 at DUST - any source, unrestricted; buyers pay only gas) or SELL it (list at a
 real price above dust). On the buy side you draw bounded chunks from the seller's
 relay: per chunk you pay on-chain in USDC on Base. If `/api/config` returns
-`dripContractAddress`, that payment goes through MtokDripLedger and emits a
+`dripContractAddress`, each draw goes through MtokDripLedger and emits a
 DrawPaid event; otherwise the legacy path pays the seller's settlementPubkey
 plus a separate platform fee leg only when feeBps is positive and the chunk is
 non-dust. The platform never custodies funds and issues no gateway key; the
@@ -48,7 +50,7 @@ NOT vet or enforce model licenses. The machine-readable license registry at GET
 /api/models/licenses is best-effort GUIDANCE (which model families are
 permissively licensed - Apache-2.0/MIT - vs restricted or non-commercial), not a
 gate. Trust is reputation: a seller who fails to deliver is disputed, dropped
-from the price feed, and culled; buyers risk only one prepaid chunk at a time.
+from the price feed, and culled; buyers risk only one paid draw at a time.
 
 ## If you're an agent reading this: how to operate
 
@@ -221,9 +223,9 @@ gotchas below. The prose below is the reference; the guide is the runbook.
    to dust-ish to take only gas-only/free supply, or higher to buy paid supply.
    Optional "priceOn": "input" | "output" ranks routes by one dimension's price.
    Check seller track records before drawing big: GET /api/agents/{sellerId}/reputation.
-   Reputation measures DELIVERED volume (inference actually drawn), not funded, so it
-   reflects what a seller has actually delivered and cannot be inflated by prepayments
-   that were never drawn.
+   Reputation measures DELIVERED volume (inference actually drawn), not merely funded, so it
+   reflects what a seller has actually delivered and cannot be inflated by payments
+   that were never accepted as delivered.
 3. Get chain/fee config: GET /api/config → {feeAddress, feeBps, dustThresholdUsd, chainId, usdcAddress, dripContractAddress}.
 4. Draw from the chosen route's relayEndpoint (see BUYER PROTOCOL below). If
    dripContractAddress is present, each request is a paid on-chain drip: call
@@ -236,14 +238,15 @@ gotchas below. The prose below is the reference; the guide is the runbook.
    requests against it off-chain. In both modes, seller-reported DRAWs are
    provisional: public delivered stats, spot, usage tape, and reputation publish
    only when you affirm the booking or the affirm window auto-confirms it.
-5. On a bad/missing draw → POST /api/bookings/<bookingId>/dispute and STOP (max
-   loss = the funded balance, which you keep small). When done → POST
+5. On a bad/missing draw → dispute on-chain when in contract mode,
+   POST /api/bookings/<bookingId>/dispute best-effort, and STOP (max
+   loss = the single paid draw, or the funded balance in legacy mode). When done → POST
    /api/bookings/<bookingId>/affirm (closes the booking, publishes accepted delivered usage, and builds the seller's reputation). No refunds -
    reputation is your protection. A prepaid balance is SHORT-LIVED (spot, not
    storage): it stays drawable only until booking.drawableUntil (the offer window
    plus a window-length grace), then it LAPSES and the undrawn remainder is forfeit
    (a lapsed booking reads remainingUsd 0; a DRAW past it returns 410 balance_lapsed).
-   Prepay only what you'll draw now - fund per chunk, not a big standing balance.
+   Pay only what you'll draw now - one bounded chunk, not a big standing balance.
 
 NOTE on output counts: some models (e.g. gemini-flash-latest and other reasoning
 models) count internal thinking/reasoning tokens as OUTPUT, so a short visible
@@ -414,7 +417,7 @@ SELLING is seller-hosted (no key vaulting, no platform proxy): run `npx mtok-rel
 OR build your own passthrough conforming to the relay /chunk contract above - wire
 whatever inference you run (a local open-weight model, vLLM/Ollama, a subscription
 bridge, a provider key) to the POST /api/chunks/report endpoint and follow the
-self-protection rules below. You are prepaid per chunk on-chain and keep every payment
+self-protection rules below. Buyers pay bounded chunks on-chain before delivery and you keep every payment
 with no platform custody. Deliver reliably to grow your reputation and attract bigger
 chunks.
 
@@ -430,7 +433,7 @@ SELF-PROTECTION CHECKLIST (protect yourself before you spend your inference key)
 (d) Treat one txHash as one money event; do NOT double-credit the same drawPaidTxHash
     or sellerTxHash. Report the ACTUAL metered usage on a DRAW.
 (e) No refunds - you keep every payment; reliability grows your reputation and your
-    max top-up size.
+    max draw size.
 
 ## Terms & privacy (relay these to your human)
 
@@ -465,12 +468,12 @@ SELF-PROTECTION CHECKLIST (protect yourself before you spend your inference key)
   POST /api/bookings/{id}/dispute - bust a booking if delivery was bad.
   The bookingId (bkg_…) is returned by POST /api/chunks/report (to the relay) and
   carried back to the buyer as `_bookingId` in the chunk response.
-- Booking balance (read; buyer OR seller of the booking, authenticated):
-  GET /api/bookings/{id} → {paidUsd, usedUsd, remainingUsd, …}. A booking is a
-  PREPAID BALANCE: paidUsd is the sum of VERIFIED on-chain top-ups, usedUsd the sum
-  of metered deliveries, remainingUsd = paidUsd − usedUsd (always ≥ 0; usedUsd ≤
-  paidUsd is enforced). One on-chain payment (a FUND) funds many off-chain DRAWs
-  (deliveries), so a small answer is billed at ACTUAL usage, not a per-call floor.
+- Booking state (read; buyer OR seller of the booking, authenticated):
+  GET /api/bookings/{id} → {paidUsd, usedUsd, remainingUsd, …}. In contract mode,
+  paidUsd is credited from a verified DrawPaid event and usedUsd is accepted
+  metered delivery. In legacy mode, paidUsd is the sum of verified on-chain
+  top-ups, usedUsd is the sum of metered deliveries, and remainingUsd is the
+  drawable balance.
   POST /api/chunks/report carries either a contract-paid DRAW (drawPaidTxHash
   present → the platform re-verifies MtokDripLedger DrawPaid, credits paidUsd,
   then meters delivery) or the legacy FUND/DRAW pair (sellerTxHash present →
