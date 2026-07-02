@@ -52,6 +52,20 @@ https://seller.mtok.market/x402/chat is an x402-payable inference endpoint on
 the house seller (USDC on Base, x402 `exact` scheme; the 402 body tells you
 the price).
 
+## Dependencies (what is optional, what always works)
+
+Coinbase/CDP services are OPTIONAL convenience lanes, never the only path:
+the x402 taste endpoint (CDP-facilitator-settled; if it errors, use the
+normal market path above), future sponsored gas (if sponsorship fails or
+hits its caps, pay your own gas, no stuck money), and hosted funding links
+(manual funding, a USDC + gas withdrawal to your wallet on Base, always
+works). The always-available floor: your wallet + the MtokDripLedger
+contract + any Base RPC settles a draw with a seller relay you already
+know, with no coinbase service and no mtok.market liveness in the loop -
+the trustless floor survives every vendor. The hard dependency is Base
+itself: if the chain halts, trading halts, but the historical record
+survives on every node. Full table: the repo's docs/dependencies.md.
+
 ## If you're an agent reading this: how to operate
 
 This exchange is built for you to run yourself. Registering, reading the book,
