@@ -268,7 +268,10 @@
                     },
                     "source": {
                       "type": "string",
-                      "enum": ["chain", "server"],
+                      "enum": [
+                        "chain",
+                        "server"
+                      ],
                       "description": "Which view produced models: 'chain' (drip-ledger derived) or 'server' (legacy fallback)."
                     },
                     "indexedToBlock": {
@@ -755,8 +758,24 @@
       "get": {
         "summary": "Chain-derived draw lists from MtokDripLedger events, newest first: ?status=inProcess (paid, no terminal yet - the default) or ?status=settled (affirmed/disputed), ?limit=N (max 200). 404 {configured:false} when no chain view is configured.",
         "parameters": [
-          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["inProcess", "settled"] } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer" } }
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "inProcess",
+                "settled"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
         ],
         "responses": {
           "200": {
@@ -864,8 +883,8 @@
     },
     "/chunks/report": {
       "post": {
-        "summary": "Report a seller-hosted chunk (seller relays only, authenticated via x-api-key). Fallback mode reports FUND then DRAW; contract mode reports a DrawPaid-backed DRAW with drawPaidTxHash.",
-        "description": "Direct-tier sellers (tier:direct offers using mtok-relay) call this after payment and delivery. Auth is the seller's x-api-key - no sellerSig field. If /config.dripContractAddress is present, the relay verifies DrawPaid before upstream delivery and reports {offerId,buyerId,bookingId,n,drawPaidTxHash,requestHash,inputTokens,outputTokens}; requestHash is sha256(JSON.stringify(request)) and must match the DrawPaid event. The platform re-verifies DrawPaid including the configured fee amount and committed requestHash, credits paidUsd by the seller-paid amount, meters the draw, and replay-guards the tx. If dripContractAddress is null, use fallback mode: FUND {sellerTxHash,feeTxHash?,priceUsd} credits a prepaid balance after direct USDC verification, then DRAW {inputTokens,outputTokens} deducts usage. A DRAW is provisional for public delivered stats, usage, spot, and reputation until the buyer affirms the booking or the affirm window auto-confirms it. buyerId must be a registered agent.",
+        "summary": "Report a seller-hosted chunk (seller relays only, authenticated via x-api-key). LEGACY direct-transfer lane only: FUND then DRAW. Contract mode is report-free; a report carrying drawPaidTxHash returns 410 reports_retired_for_contract_lane.",
+        "description": "Direct-tier sellers (tier:direct offers using mtok-relay) call this after payment and delivery on the LEGACY direct-transfer lane only (dripContractAddress null). Auth is the seller's x-api-key - no sellerSig field. FUND {sellerTxHash,feeTxHash?,priceUsd} credits a prepaid balance after direct USDC verification, then DRAW {inputTokens,outputTokens} deducts usage. A DRAW is provisional for public delivered stats, usage, spot, and reputation until the buyer affirms the booking or the affirm window auto-confirms it. buyerId must be a registered agent. CONTRACT MODE IS RETIRED HERE (chain-native phase 2): a contract draw is indexed from MtokDripLedger DrawPaid/DrawAffirmed events, so there is nothing to report - the relay serves report-free (verify DrawPaid, cap output from the paid amount, deliver, cache per bookingId+n) and any report carrying drawPaidTxHash returns 410 reports_retired_for_contract_lane pointing at GET /api/chain/draws, the canonical contract tape.",
         "security": [
           {
             "apiKey": []
@@ -894,7 +913,7 @@
                   "n": {
                     "type": "integer",
                     "minimum": 0,
-                    "description": "Relay-supplied sequence id for this offer+buyer booking. Contract mode is idempotent on (booking, drawPaidTxHash); fallback FUND is idempotent on (booking, sellerTxHash); DRAW is idempotent on (booking, n) - reuse the same n only to retry the same delivery."
+                    "description": "Relay-supplied sequence id for this offer+buyer booking. FUND is idempotent on (booking, sellerTxHash); DRAW is idempotent on (booking, n) - reuse the same n only to retry the same delivery."
                   },
                   "priceUsd": {
                     "type": "number",
@@ -911,11 +930,11 @@
                   },
                   "drawPaidTxHash": {
                     "type": "string",
-                    "description": "Contract mode only. On-chain tx hash whose receipt contains a MtokDripLedger DrawPaid event for this buyerId, offerId, bookingId, model, and n. Present with inputTokens/outputTokens after the relay has delivered the paid draw."
+                    "description": "RETIRED (contract mode). Present => 410 reports_retired_for_contract_lane: contract draws are indexed from MtokDripLedger events and must not be reported. Serve report-free and see GET /api/chain/draws."
                   },
                   "requestHash": {
                     "type": "string",
-                    "description": "Contract mode only. sha256(JSON.stringify(request)) for the exact request delivered by the relay. Must match the DrawPaid event's requestHash; binds one payment proof to one request."
+                    "description": "RETIRED (contract mode, rode along with drawPaidTxHash). A contract relay still computes sha256(JSON.stringify(request)) to verify the DrawPaid event before delivery, but nothing is reported here."
                   },
                   "inputTokens": {
                     "type": "integer",
@@ -934,7 +953,7 @@
         },
         "responses": {
           "201": {
-            "description": "Report accepted. {booking} including paidUsd, usedUsd, remainingUsd. Contract mode credited DrawPaid and metered delivery; fallback FUND credited a prepaid balance and fallback DRAW metered delivery. Public stats/spot/reputation stay provisional until buyer affirm or auto-confirm.",
+            "description": "Report accepted (legacy lane). {booking} including paidUsd, usedUsd, remainingUsd. A FUND credited a prepaid balance; a DRAW metered delivery. Public stats/spot/reputation stay provisional until buyer affirm or auto-confirm.",
             "content": {
               "application/json": {
                 "schema": {
@@ -962,7 +981,7 @@
             "description": "Missing or invalid x-api-key (must be the seller's key)."
           },
           "402": {
-            "description": "chunk_unpaid / chunk_fee_unpaid / draw_paid_unverified (payment did not verify on-chain) or balance_exhausted (a DRAW would push usedUsd past paidUsd - top up first). Separately, a fallback DRAW past the booking's drawableUntil returns 410 balance_lapsed: the prepaid balance is short-lived and the undrawn remainder is then forfeit.",
+            "description": "chunk_unpaid / chunk_fee_unpaid (payment did not verify on-chain) or balance_exhausted (a DRAW would push usedUsd past paidUsd - top up first).",
             "content": {
               "application/json": {
                 "schema": {
@@ -978,7 +997,17 @@
             "description": "offer_not_found (or not a direct-tier offer)."
           },
           "409": {
-            "description": "chunk_replayed (drawPaidTxHash or sellerTxHash already used, or a DRAW reused n with different metering) or buyer_address_mismatch (TOFU bind)."
+            "description": "chunk_replayed (sellerTxHash already used, or a DRAW reused n with different metering) or buyer_address_mismatch (TOFU bind)."
+          },
+          "410": {
+            "description": "reports_retired_for_contract_lane - the report carried drawPaidTxHash. Contract draws are indexed from MtokDripLedger events (nothing to report; see GET /api/chain/draws). Also: balance_lapsed for a legacy DRAW past the booking's drawableUntil (the undrawn remainder is forfeit).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
