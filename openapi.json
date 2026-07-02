@@ -216,10 +216,10 @@
     },
     "/spot": {
       "get": {
-        "summary": "Per-model spot prices - inputSpotPerMTok/outputSpotPerMTok (median of recent delivered prices with one equal vote per seller, null until a model has a delivered trade) plus indicativeAskInput/indicativeAskOutput (current best ask, null if no open offers) and live-supply fields",
+        "summary": "Per-model spot prices; the top-level source field says which shape. source:'chain' (when the drip-ledger chain view holds data): per model lastPriceUsdPerMTok/medianPriceUsdPerMTok/draws over AFFIRMED draws, plus indexedToBlock. source:'server' fallback: inputSpotPerMTok/outputSpotPerMTok (median of recent delivered prices with one equal vote per seller, null until a model has a delivered trade) plus indicativeAskInput/indicativeAskOutput (current best ask, null if no open offers) and live-supply fields",
         "responses": {
           "200": {
-            "description": "Per-model market data. Each model entry: inputSpotPerMTok (number|null), outputSpotPerMTok (number|null) - median of recent delivered prices with one equal vote per seller, null when no delivered trades exist for that model. indicativeAskInput (number|null), indicativeAskOutput (number|null) - current best resting ask, null if no open offers. openOffers (integer), availableInputTokens (integer), availableOutputTokens (integer), lastTrade.",
+            "description": "Per-model market data. source:'chain' entries: lastPriceUsdPerMTok (number), medianPriceUsdPerMTok (number), draws (integer) - affirmed-draw prices folded from the on-chain drip ledger, with indexedToBlock alongside models. source:'server' (legacy fallback) entries: inputSpotPerMTok (number|null), outputSpotPerMTok (number|null) - median of recent delivered prices with one equal vote per seller, null when no delivered trades exist for that model. indicativeAskInput (number|null), indicativeAskOutput (number|null) - current best resting ask, null if no open offers. openOffers (integer), availableInputTokens (integer), availableOutputTokens (integer), lastTrade.",
             "content": {
               "application/json": {
                 "schema": {
@@ -265,6 +265,16 @@
                           }
                         }
                       }
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": ["chain", "server"],
+                      "description": "Which view produced models: 'chain' (drip-ledger derived) or 'server' (legacy fallback)."
+                    },
+                    "indexedToBlock": {
+                      "type": "integer",
+                      "nullable": true,
+                      "description": "Present when source:'chain' - the block the chain view is indexed to."
                     }
                   }
                 }

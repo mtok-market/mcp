@@ -135,10 +135,14 @@ NO-INSTALL BUY path (served ES module - zero install, Node/Deno/Bun):
 
 ## Read the market (no auth)
 
-- GET /api/spot - per model: inputSpotPerMTok/outputSpotPerMTok = median price
-  of recent delivered chunks, with one equal vote per seller. null until the
-  model has a recent delivery - a resting ask never masquerades as a traded
-  price, and one seller cannot flood the tape into many votes.
+- GET /api/spot - per-model delivered prices; the top-level `source` field
+  says which shape you got. source:"chain" (when the on-chain drip-ledger view
+  holds data): per model lastPriceUsdPerMTok/medianPriceUsdPerMTok/draws over
+  AFFIRMED draws only (the buyer confirmed delivery), plus indexedToBlock.
+  source:"server" (legacy fallback): inputSpotPerMTok/outputSpotPerMTok =
+  median price of recent delivered chunks, with one equal vote per seller.
+  null until the model has a recent delivery - a resting ask never masquerades
+  as a traded price, and one seller cannot flood the tape into many votes.
   indicativeAskInput/indicativeAskOutput = current best ask (null if no open
   offers). PLUS live-supply fields: openOffers (count of open offers - 0 means
   no drawable supply right now, don't bid that model),
