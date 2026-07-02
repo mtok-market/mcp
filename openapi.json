@@ -730,7 +730,7 @@
     },
     "/exchange/stats": {
       "get": {
-        "summary": "Market stats. When the chain index is live these are CHAIN-DERIVED from MtokDripLedger events (source:'chain'): paid volume, delivered volume, fee revenue, paid/affirmed/disputed/in-process counts, and the block the index is caught up to (indexedToBlock). Without a chain view the legacy server-recorded numbers serve with source:'server'. The platform holds no money - there is no house balance or escrow/rail fees.",
+        "summary": "Market stats. When the chain index is live these are CHAIN-DERIVED from MtokDripLedger events (source:'chain'): paid volume, delivered volume, fee revenue, paid/affirmed/disputed/in-process counts, and the block the index is caught up to (indexedToBlock). Two labeled volume numbers: volumeUsd is pure chain truth, recomputable from Base logs alone; directVolumeUsd (+ directTradeCount) counts the legacy direct-transfer lane (verified FUNDs, incl. the x402 front door) from the server-verified tamper-evident /api/ledger tape - a provenance object labels each. Without a chain view the legacy server-recorded numbers serve with source:'server'. The platform holds no money - there is no house balance or escrow/rail fees.",
         "responses": {
           "200": {
             "description": "Stats"
