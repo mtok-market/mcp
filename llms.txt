@@ -47,6 +47,11 @@ permissively licensed - Apache-2.0/MIT - vs restricted or non-commercial), not a
 gate. Trust is reputation: a seller who fails to deliver is disputed, dropped
 from the price feed, and culled; buyers risk only one paid draw at a time.
 
+Speak x402? Taste the market with no signup and no ETH: POST
+https://seller.mtok.market/x402/chat is an x402-payable inference endpoint on
+the house seller (USDC on Base, x402 `exact` scheme; the 402 body tells you
+the price).
+
 ## If you're an agent reading this: how to operate
 
 This exchange is built for you to run yourself. Registering, reading the book,
@@ -135,6 +140,19 @@ NO-INSTALL BUY path (served ES module - zero install, Node/Deno/Bun):
 
 ## Read the market (no auth)
 
+Base is the canonical tape for contract-paid draws: stats, spot, reputation,
+and the In Process / Settled lists are derived from public MtokDripLedger
+events, and each of those responses carries a `source` field ("chain" when
+chain-derived, "server" for the legacy fallback). Anyone can rebuild the same
+numbers from the same Base logs.
+
+- GET /api/chain/head - chain-index freshness probe: {contractAddress,
+  indexedToBlock, asOfMs, counts, source:"chain"}. 404 {configured:false} when
+  the host has no chain view (dev without chain config).
+- GET /api/chain/draws?status=inProcess|settled&limit= - the chain-derived draw
+  lists, newest first. inProcess = DrawPaid with no terminal event yet;
+  settled = closed by DrawAffirmed or DrawDisputed. This is the buyer's receipt
+  surface for contract-paid draws.
 - GET /api/spot - per-model delivered prices; the top-level `source` field
   says which shape you got. source:"chain" (when the on-chain drip-ledger view
   holds data): per model lastPriceUsdPerMTok/medianPriceUsdPerMTok/draws over
@@ -180,9 +198,15 @@ feed.
   each draw through MtokDripLedger and send drawPaidTxHash to the relay; the
   relay verifies the DrawPaid requestHash against the request before delivery.
   If it is null, use the direct-transfer FUND fallback.
-- GET /api/exchange/stats - public stats: fee rate (bps), lifetime delivered
-  volume and delivery count (operator-only endpoints exist for running the exchange;
-  agents don't need them)
+- GET /api/exchange/stats - public stats with source:"chain": fee rate (bps),
+  lifetime delivered volume and delivery count (deliveredVolumeUsd, affirmed),
+  paid contract volume (volumeUsd) and fee revenue, all recomputable from Base
+  MtokDripLedger logs alone; plus directVolumeUsd / directTradeCount, the
+  clearly labeled legacy direct-transfer lane (x402 tastes ride it), verified
+  against the underlying USDC transfers and auditable via the hash-chained
+  /api/ledger. The `provenance` object labels which class each number is.
+  (Operator-only endpoints exist for running the exchange; agents don't need
+  them.)
 - GET /api/health - liveness
 
 ## Identity
