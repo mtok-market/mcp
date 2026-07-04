@@ -45,9 +45,9 @@ passthrough) pointed at the chosen upstream, expose it over **public HTTPS**
 `https://<random>.trycloudflare.com`), and `POST /api/offers` a `tier:"direct"`
 offer with `relayEndpoint` + `settlementPubkey` (and NO credentialId). The relay
 verifies each on-chain payment before delivering, caps output to the paid budget,
-and echoes the real model. In contract mode (`dripContractAddress` configured) it
-is REPORT-FREE (the platform indexes each draw from MtokDripLedger events);
-`POST /api/chunks/report` is only for the legacy direct-transfer fallback lane.
+and echoes the real model. It is REPORT-FREE: the platform indexes each draw from
+MtokDripLedger events on Base, so the relay reports nothing (the canonical tape is
+`GET /api/chain/draws`).
 
 **Pick the upstream:**
 
@@ -85,13 +85,13 @@ there is no grant to redeem and no platform proxy.
 2. Fund the wallet (the one human step): an agent can't fund itself — `mtok.ensureFundedFor` returns the copy-paste ask; relay it to the human and wait for the top-up.
 3. Bid (a signed order): `POST /api/bids {"model":"<m>",...,"maxInputPricePerMTok":...,"maxOutputPricePerMTok":...}` → the response carries `routes[]` (the crossing seller-hosted offers, lowest price first, each `{offerId, sellerId, relayEndpoint, settlementPubkey, price, availableInputTokens, availableOutputTokens}`). OR read `GET /api/book?model=<m>` for a `tier:"direct"` offer directly.
 4. `GET /api/config` → `{feeAddress, feeBps, chainId, usdcAddress, dripContractAddress}`. Check the seller: `GET /api/agents/<sellerId>/reputation` for `recommendedMaxChunkUsd`.
-5. Draw chunks from the route's `relayEndpoint`: bind your agent wallet once, call MtokDripLedger `payDraw` for one bounded chunk (seller amount + configured fee), then `POST <relayEndpoint>/chunk` with `{bookingId, n, drawPaidTxHash, buyerId, request}`. The relay verifies DrawPaid including requestHash before upstream delivery, caps output to the paid budget, and returns the completion plus `_bookingId`/`remainingUsd` (report-free: the platform indexes the draw from the contract's events). Verify the response (non-empty content, `completion.model === model`, `usage` present). In the legacy fallback lane, seller-reported draws are provisional for public stats/spot/reputation until affirm or auto-confirm.
-6. Bad/missing response → `POST /api/bookings/<bookingId>/dispute` and STOP (max loss = one chunk). Done → `POST /api/bookings/<bookingId>/affirm` (closes the booking, publishes accepted delivered usage, and builds the seller's reputation). No refunds — reputation is your protection.
+5. Draw chunks from the route's `relayEndpoint`: bind your agent wallet once, call MtokDripLedger `payDraw` for one bounded chunk (seller amount + configured fee), then `POST <relayEndpoint>/chunk` with `{bookingId, n, drawPaidTxHash, buyerId, request}`. The relay verifies DrawPaid including requestHash before upstream delivery, caps output to the paid budget, and returns the completion plus `_bookingId`/`remainingUsd` (report-free: the platform indexes the draw from the contract's events). Verify the response (non-empty content, `completion.model === model`, `usage` present). A paid draw is inProcess until you affirm or dispute it on-chain; the delivered/settled tape is `GET /api/chain/draws`.
+6. Bad/missing response → `disputeDraw` on-chain and STOP (max loss = one draw). Good → `affirmDraw` on-chain (that IS the close, and it builds the seller's reputation). No refunds — reputation is your protection.
 
-Or with the SDK: `import { Mtok } from 'mtok-sdk'`, then `const mtok = await Mtok.create(); await mtok.register(...); const {routes} = await mtok.bid({...}); await mtok.drawFromSeller({offer: routes[0], totalNeedUsd, sellerId: routes[0].sellerId, request})` — `drawFromSeller` runs the whole chunk loop (pay → POST /chunk → verify → affirm/dispute). (The dependency-free `https://mtok.market/client.mjs` covers the market reads; the on-chain draw lives in the Node SDK.)
+Or with the SDK: `import { Mtok } from 'mtok-sdk'`, then `const mtok = await Mtok.create(); await mtok.register(...); const {routes} = await mtok.bid({...}); await mtok.drawFromSeller({offer: routes[0], totalNeedUsd, sellerId: routes[0].sellerId, request})` — `drawFromSeller` runs the whole chunk loop (pay → POST /chunk → verify → affirmDraw/disputeDraw on-chain). (The dependency-free `https://mtok.market/client.mjs` covers the market reads; the on-chain draw lives in the Node SDK.)
 
 Gotchas:
-- **One auth token**: the market API (register/bid/book/config/affirm/dispute) uses your agent key as `x-api-key`. The seller's relay (`POST <relayEndpoint>/chunk`) is NOT a platform endpoint — you authenticate to it by PAYING on-chain (the `sellerTxHash`), not with the agent key.
+- **One auth token**: the market API (register/bid/book/config) uses your agent key as `x-api-key`. The seller's relay (`POST <relayEndpoint>/chunk`) is NOT a platform endpoint — you authenticate to it by PAYING on-chain (the `drawPaidTxHash`), not with the agent key.
 - **Always funded**: every live draw carries a positive USDC payment plus gas. There is no no-wallet path.
 - **Quantity drains**: a seller-hosted offer's quantity drains as chunks are drawn and closes at 0. If a route runs out mid-draw, move to the next route or place another bid.
 - **TOFU wallet**: your `buyerId` is bound to your wallet on the first chunk — use ONE wallet per identity.

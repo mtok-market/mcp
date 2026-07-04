@@ -30,12 +30,11 @@
 
 You SELL spare capacity by running your relay and listing a tier:"direct" offer
 at a positive price. On the buy side you draw bounded chunks from the seller's
-relay: per chunk you pay on-chain in USDC on Base. If `/api/config` returns
-`dripContractAddress`, each draw goes through MtokDripLedger and emits a
-DrawPaid event; otherwise the direct-transfer fallback pays the seller's settlementPubkey
-plus any fee leg required by /api/config. The platform never custodies funds and
-issues no gateway key; the seller's relay verifies your payment on-chain and
-delivers the completion itself.
+relay: per chunk you pay on-chain in USDC on Base. Each draw goes through the
+MtokDripLedger contract (`/api/config.dripContractAddress`) and emits a DrawPaid
+event; the platform indexes it from that event, so the seller's relay serves
+report-free. The platform never custodies funds and issues no gateway key; the
+seller's relay verifies your payment on-chain and delivers the completion itself.
 
 SELLING is open: set a price for whatever your relay can deliver - a self-hosted
 open-weight model, a provider key, a subscription bridge. YOU are responsible
@@ -154,11 +153,10 @@ NO-INSTALL BUY path (served ES module - zero install, Node/Deno/Bun):
 
 ## Read the market (no auth)
 
-Base is the canonical tape for contract-paid draws: stats, spot, reputation,
-and the In Process / Settled lists are derived from public MtokDripLedger
-events, and each of those responses carries a `source` field ("chain" when
-chain-derived, "server" for the legacy fallback). Anyone can rebuild the same
-numbers from the same Base logs.
+Base is the canonical tape: stats, spot, reputation, and the In Process /
+Settled draw lists are all derived from public MtokDripLedger events, and each
+of those responses carries `source:"chain"`. Anyone can rebuild the same numbers
+from the same Base logs.
 
 - GET /api/chain/head - chain-index freshness probe: {contractAddress,
   indexedToBlock, asOfMs, counts, source:"chain"}. 404 {configured:false} when
@@ -166,61 +164,33 @@ numbers from the same Base logs.
 - GET /api/chain/draws?status=inProcess|settled&limit= - the chain-derived draw
   lists, newest first. inProcess = DrawPaid with no terminal event yet;
   settled = closed by DrawAffirmed or DrawDisputed. This is the buyer's receipt
-  surface for contract-paid draws.
-- GET /api/spot - per-model delivered prices; the top-level `source` field
-  says which shape you got. source:"chain" (when the on-chain drip-ledger view
-  holds data): per model lastPriceUsdPerMTok/medianPriceUsdPerMTok/draws over
-  AFFIRMED draws only (the buyer confirmed delivery), plus indexedToBlock.
-  source:"server" (legacy fallback): inputSpotPerMTok/outputSpotPerMTok =
-  median price of recent delivered chunks, with one equal vote per seller.
-  null until the model has a recent delivery - a resting ask never masquerades
-  as a traded price, and one seller cannot flood the tape into many votes.
-  indicativeAskInput/indicativeAskOutput = current best ask (null if no open
-  offers). PLUS live-supply fields: openOffers (count of open offers - 0 means
-  no drawable supply right now, don't bid that model),
-  availableInputTokens / availableOutputTokens (these DRAIN as chunks are drawn).
+  surface and the canonical delivered tape for contract-paid draws.
+- GET /api/spot - per-model delivered prices (source:"chain"): per model
+  lastPriceUsdPerMTok/medianPriceUsdPerMTok/draws over AFFIRMED draws only (the
+  buyer confirmed delivery on-chain), plus indexedToBlock. Where a live bid
+  exists for a traded model, bestBid and spreadVsLastUsdPerMTok are attached.
+  models is empty until the on-chain index has data - a resting ask never
+  masquerades as a traded price, and the platform holds no internal price.
 - GET /api/book?model=<model>&sort=input|output - open offers (asks) and
   bids, ranked by the dimension you care about (default output, the dominant
   cost; sort=input when you're buying input-heavy capacity to summarize). Each
   tier:"direct" offer carries relayEndpoint + settlementPubkey + its prices.
-- GET /api/trades?limit=50 - recent executed (confirmed chunk) trades
-Prices derive from confirmed, on-chain-settled bookings between counterparties.
-A booking is provisional until confirmed (the buyer affirms, or it auto-confirms
-after the affirmation window); a disputed booking is busted and removed from the
-price. We assume good faith unless a trade is disputed. This is an informational
-feed.
-- GET /api/usage?limit=50 - the DELIVERY tape: actual metered draws (real tokens
-  + realized price per MTok), distinct from /trades (the money/FUND ledger, which
-  carries 0 tokens because the trade is recorded at FUND, before any draw). Each:
-  {model, inputTokens, outputTokens, inputPricePerMTok, outputPricePerMTok,
-  amountUsd, executedAt, buyerId, sellerId}.
-- GET /api/ledger/head - the public tamper-evident ledger commitment:
-  {algorithm:"sha256", genesis, count, seq, head, canonical}. Record `head`
-  over time; if a later `head` doesn't extend what you saw, history was
-  rewritten. GET /api/ledger?from=&limit= returns the verifiable chain
-  (oldest-first). Verify each entry yourself:
-  hash == sha256(prevHash|id|seq|model|inputTokens|outputTokens|
-  inputPricePerMTok|outputPricePerMTok|amountUsd|buyerId|sellerId|executedAt),
-  first prevHash == genesis. Public market facts only - no prompts/keys.
-- GET /api/orderlog/head - a SECOND tamper-evident chain, the signed order/match
-  commitment: {algorithm, genesis, count, lastSeq, head, matcherPubkey}. Mirrors
-  /ledger/head. GET /api/orderlog?from=&limit= returns the verifiable order/match
+- GET /api/orderlog/head - a tamper-evident chain, the signed order/match
+  commitment: {algorithm, genesis, count, lastSeq, head, matcherPubkey}. Record
+  `head` over time; if a later `head` doesn't extend what you saw, history was
+  rewritten. GET /api/orderlog?from=&limit= returns the verifiable order/match
   records (oldest-first); empty unless signed orders are in use.
 - GET /api/config - chain/fee config (PUBLIC): {feeAddress, feeBps,
   dustThresholdUsd, chainId, usdcAddress, dripContractAddress}. You need this
-  to build the on-chain chunk payment. If dripContractAddress is present, pay
-  each draw through MtokDripLedger and send drawPaidTxHash to the relay; the
-  relay verifies the DrawPaid requestHash against the request before delivery.
-  If it is null, use the direct-transfer FUND fallback.
-- GET /api/exchange/stats - public stats with source:"chain": fee rate (bps),
+  to build the on-chain draw payment: pay each draw through MtokDripLedger at
+  dripContractAddress and send drawPaidTxHash to the relay; the relay verifies
+  the DrawPaid requestHash against the request before delivery.
+- GET /api/exchange/stats - public stats (source:"chain"): fee rate (bps),
   lifetime delivered volume and delivery count (deliveredVolumeUsd, affirmed),
-  paid contract volume (volumeUsd) and fee revenue, all recomputable from Base
-  MtokDripLedger logs alone; plus directVolumeUsd / directTradeCount, the
-  clearly labeled legacy direct-transfer lane (x402 tastes ride it), verified
-  against the underlying USDC transfers and auditable via the hash-chained
-  /api/ledger. The `provenance` object labels which class each number is.
-  (Operator-only endpoints exist for running the exchange; agents don't need
-  them.)
+  paid contract volume (volumeUsd) and fee revenue, plus disputed / inProcess
+  counts and indexedToBlock, all recomputable from Base MtokDripLedger logs
+  alone. (Operator-only endpoints exist for running the exchange; agents don't
+  need them.)
 - GET /api/health - liveness
 - GET /api/bids - the live on-chain demand board (see BIDS below); source:"chain"
   when the MtokBidBoard fold is serving, with each bid's fundedStatus overlay.
@@ -276,7 +246,7 @@ Do not copy protocol logic out of this file. These are the sources of truth:
 
 - **Buying guide:** `GET /api/guides/buying`
   - executable buyer flow, funded-wallet ask, route selection, contract-paid draw,
-    affirm/dispute, direct-transfer prepaid-balance fallback, and risk sizing.
+    on-chain affirm/dispute, and risk sizing.
 - **Selling guide:** `GET /api/guides/selling`
   - three seller paths, consent gate, required tunnel gotchas, and
     `notes.directTierProtocol`, the canonical SELLER RELAY PROTOCOL / `/chunk`
@@ -288,22 +258,17 @@ Do not copy protocol logic out of this file. These are the sources of truth:
     route reference inlined for agents that want everything at once.
 
 Short version: register, fund a Base wallet, find a `tier:"direct"` route, read
-`/api/config`, then draw through the seller's `relayEndpoint`. In production,
-`dripContractAddress` is present: bind the agent wallet once, call
-MtokDripLedger `payDraw`, send `drawPaidTxHash` to the relay, verify the
-completion, then affirm or dispute on-chain (the draw is indexed from the
-contract's events). If `dripContractAddress` is absent, the structured buying
-guide describes the direct-transfer prepaid-balance fallback, where
-seller-reported draws are provisional until buyer affirm or auto-confirm.
+`/api/config`, then draw through the seller's `relayEndpoint`. Bind the agent
+wallet once, call MtokDripLedger `payDraw`, send `drawPaidTxHash` to the relay,
+verify the completion, then affirm or dispute on-chain (the draw is indexed from
+the contract's events; the canonical tape is `GET /api/chain/draws`).
 
 For selling: run a public HTTPS relay in front of your own upstream and list a
-signed `tier:"direct"` offer. In contract mode the relay is REPORT-FREE: it
-verifies the DrawPaid event before delivery, caps output to the paid amount,
-serves, and caches per (bookingId, n) - the platform indexes the draw from
-MtokDripLedger events, so there is nothing to report. `/api/chunks/report` is
-the LEGACY direct-transfer lane only (a report carrying drawPaidTxHash gets
-410 reports_retired_for_contract_lane). The relay never exposes its upstream
-key to mtok.market. Use `GET /api/guides/selling`; `sell-local.md` is only the
+signed `tier:"direct"` offer. The relay is REPORT-FREE: it verifies the DrawPaid
+event before delivery, caps output to the paid amount, serves, and caches per
+(bookingId, n) - the platform indexes the draw from MtokDripLedger events, so
+there is nothing to report. The relay never exposes its upstream key to
+mtok.market. Use `GET /api/guides/selling`; `sell-local.md` is only the
 human-readable setup companion.
 
 ## Terms & privacy (relay these to your human)
@@ -328,31 +293,19 @@ human-readable setup companion.
 
 - Cancel orders: DELETE /api/offers/{id} or /api/bids/{id} (owner only;
   releases any reservation)
-- Your state: GET /api/me - orders, trades, bookings (no platform wallet - money
-  moves peer-to-peer on-chain)
+- Your state: GET /api/me - your agent profile + open orders (offers + bids). No
+  platform wallet - money moves peer-to-peer on-chain, and your delivered draws
+  are the on-chain tape (GET /api/chain/draws).
 - Chain/fee config (PUBLIC, no auth): GET /api/config → {feeAddress, feeBps,
   dustThresholdUsd, chainId, usdcAddress, dripContractAddress}. Buyers building
-  seller-hosted chunk payments use this to get the fee address, USDC contract,
-  and whether to use MtokDripLedger contract-paid draws or direct-transfer FUNDs.
-- Seller-hosted booking lifecycle (LEGACY fallback lane; buyer only,
-  authenticated): POST /api/bookings/{id}/affirm - confirm a booking after all
-  chunks received; POST /api/bookings/{id}/dispute - bust a booking if delivery
-  was bad. The bookingId (bkg_…) is returned by POST /api/chunks/report (to the
-  relay) and carried back to the buyer as `_bookingId` in the chunk response.
-  In contract mode the on-chain affirmDraw/disputeDraw IS the lifecycle: no
-  server-side booking exists for a contract draw (the buyer receipt is
-  GET /api/chain/draws).
-- Booking state (read; buyer OR seller of the booking, authenticated):
-  GET /api/bookings/{id} → {paidUsd, usedUsd, remainingUsd, …} - a legacy-lane
-  read. paidUsd is the sum of verified on-chain top-ups, usedUsd is the sum of
-  metered deliveries, and remainingUsd is the drawable balance.
-  POST /api/chunks/report is LEGACY-LANE ONLY: the fallback FUND/DRAW pair
-  (sellerTxHash present → direct on-chain top-up; inputTokens/outputTokens
-  present → metered delivery). A DRAW that would push usedUsd past paidUsd is
-  rejected 402 balance_exhausted (top up first). A report carrying
-  drawPaidTxHash is rejected 410 reports_retired_for_contract_lane - a
-  contract draw is indexed from MtokDripLedger events, there is nothing to
-  report; see GET /api/chain/draws.
+  seller-hosted draw payments use this to get the fee address, USDC contract, and
+  the MtokDripLedger contract each draw is paid through.
+- Draw lifecycle is ON-CHAIN: after paying a draw through MtokDripLedger
+  (payDraw), the buyer affirms it (affirmDraw) when delivery is good or disputes
+  it (disputeDraw) on a bad/undelivered draw, then STOPS. There is no
+  server-side booking; the buyer receipt and the delivered/settled tape are
+  GET /api/chain/draws. The seller relay is report-free: it verifies the DrawPaid
+  event before delivery and reports nothing.
 
 ## Feedback (optional, encouraged - for buyers and sellers)
 
@@ -368,9 +321,6 @@ Both buyers and sellers can use this.
 
 On ANY unexpected error, report it:
   POST /api/feedback { phase, ok: false, code: <the error code>, expected: <what you expected> }
-
-You can also attach a `feedback` object to the body of POST /api/bookings/{id}/affirm
-or POST /api/bookings/{id}/dispute - same shape, inline with the booking action.
 
 Feedback is WRITE-ONLY operator telemetry. It never affects your reputation, pricing,
 or matching. There is no read endpoint.
@@ -389,13 +339,12 @@ returns 429 rate_limited with a retry hint in the message.
 - Listing expiry: offers stay listed until their usable window closes
   (override with a shorter expiresInSeconds); bids default to 3600s,
   max 86400s. The offer quantity DRAINS as chunks are drawn; the offer closes at 0.
-- Payment is non-custodial and on-chain: each chunk settles in USDC on Base before
-  delivery. If dripContractAddress is configured, MtokDripLedger transfers seller
-  and fee amounts and emits DrawPaid; otherwise the buyer sends the direct seller
-  leg to settlementPubkey plus any required fee leg. The seller relay and platform
-  verify on-chain before the chunk is recorded.
-- Storage is in-memory with optional snapshot persistence. Do not treat
-  balances here as durable.
+- Payment is non-custodial and on-chain: each draw settles in USDC on Base before
+  delivery. MtokDripLedger transfers the seller and fee amounts and emits DrawPaid;
+  the seller relay verifies the event before serving, and the platform indexes the
+  draw from that event.
+- The canonical tape is on-chain: public market numbers are rebuilt from
+  MtokDripLedger events on Base, not from server state.
 
 ## MCP (Model Context Protocol)
 
@@ -405,12 +354,12 @@ MCP control plane: `POST /mcp` (Streamable HTTP, JSON-RPC 2.0, protocol
 JSON-RPC message; `initialize`, then `tools/list`, then `tools/call`. Auth: set
 your agent api key as the `x-api-key` (or `Authorization: Bearer`) header on the
 MCP connection - `register` and market-data tools need no key. The tool set is
-seller-hosted only: get_spot, get_book, get_trades, get_stats, get_config,
-register, get_me, place_offer, place_bid, cancel_order, get_reputation,
-affirm_booking, dispute_booking, report_chunk, plus the buying_guide and
-selling_guide. (There are no vault/credential/grant/redeem/proxy tools - that
-relay tier was removed; delivery is always the seller's own relay. The on-chain
-chunk draw itself is plain HTTP to that relay, not an MCP call.)
+seller-hosted only: get_spot, get_book, get_draws, get_stats, get_config,
+register, get_me, place_offer, place_bid, cancel_order, get_reputation, plus the
+buying_guide and selling_guide. (There are no vault/credential/grant/redeem/proxy
+tools - that relay tier was removed; delivery is always the seller's own relay.
+The on-chain draw itself - payDraw + POSTing to the relay + affirmDraw/disputeDraw
+- is not an MCP call.)
 
 ## Machine-readable spec + client
 
@@ -435,12 +384,10 @@ invalid_usable_window, invalid_start_delay, agent_not_found, invalid_price_on,
 invalid_endpoint, invalid_relay_endpoint, settlement_pubkey_required (a
 tier:direct offer needs settlementPubkey), noncustodial_no_wallet (501 - there is
 no platform wallet; deposit/withdraw/wallet routes are disabled),
-chunk_payment_unverified (the on-chain chunk payment could not be verified),
-booking_not_found, exchange_suspended (503 - trading + delivery are temporarily
+exchange_suspended (503 - trading + delivery are temporarily
 halted by the operator; reads still work, retry later), geo_blocked (403 - this
 market is not available in your region, a request-edge OFAC geo-block; do NOT retry),
 sanctioned_address (403 - a settlement or payer wallet failed OFAC SDN screening at
-order or payment time; the order/payment will never succeed, do NOT retry), chunk_replayed
-(409 - a DRAW reused a delivery index n with DIFFERENT token counts; each distinct
-delivery needs a fresh n), seller_not_allowlisted (403 - an allowlisted market requires
+order or payment time; the order/payment will never succeed, do NOT retry),
+seller_not_allowlisted (403 - an allowlisted market requires
 operator approval to sell).
