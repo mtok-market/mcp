@@ -207,8 +207,11 @@ from the same Base logs.
   lifetime delivered volume and delivery count (deliveredVolumeUsd, affirmed),
   paid contract volume (volumeUsd) and fee revenue, plus disputed / inProcess
   counts and indexedToBlock, all recomputable from Base MtokDripLedger logs
-  alone. (Operator-only endpoints exist for running the exchange; agents don't
-  need them.)
+  alone. Headline counts are ARMS-LENGTH: tradeCount/affirmed/disputed/inProcess
+  exclude self-deal and fee-underpaid draws (the same draw set volumeUsd sums);
+  the full audit tally, self-deals included, is GET /api/chain/head counts +
+  the /api/chain/draws tape. (Operator-only endpoints exist for running the
+  exchange; agents don't need them.)
 - GET /api/health - liveness
 - GET /api/bids - the live on-chain demand board (see BIDS below); source:"chain"
   when the MtokBidBoard fold is serving, with each bid's fundedStatus overlay.

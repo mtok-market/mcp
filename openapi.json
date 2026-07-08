@@ -638,7 +638,7 @@
     },
     "/exchange/stats": {
       "get": {
-        "summary": "Market stats, CHAIN-DERIVED from MtokDripLedger events (source:'chain'): { feeBps, volumeUsd, deliveredVolumeUsd, feeRevenueUsd, tradeCount, affirmed, disputed, inProcess, source:'chain', indexedToBlock }. volumeUsd is paid contract volume; deliveredVolumeUsd is affirmed delivered volume; all recomputable from Base logs alone. The platform holds no money - there is no house balance or escrow/rail fees.",
+        "summary": "Market stats, CHAIN-DERIVED from MtokDripLedger events (source:'chain'): { feeBps, volumeUsd, deliveredVolumeUsd, feeRevenueUsd, tradeCount, affirmed, disputed, inProcess, source:'chain', indexedToBlock }. volumeUsd is paid contract volume; deliveredVolumeUsd is affirmed delivered volume; all recomputable from Base logs alone. Headline counts are arms-length: tradeCount/affirmed/disputed/inProcess exclude self-deal and fee-underpaid draws (the same draw set volumeUsd sums); the full audit tally is GET /chain/head counts + the /chain/draws tape. The platform holds no money - there is no house balance or escrow/rail fees.",
         "responses": {
           "200": {
             "description": "Stats"
