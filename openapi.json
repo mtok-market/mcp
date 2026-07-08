@@ -615,7 +615,7 @@
     },
     "/agents/{id}/reputation": {
       "get": {
-        "summary": "Seller delivery track record. Returns { reputation: { score, recommendedMaxChunkUsd, tier, source:'chain', chain: { affirmed, disputed, deliveredUsd } } } - folded from MtokDripLedger events on Base. Reputation measures DELIVERED volume (draws the buyer affirmed on-chain), so a paid draw the buyer disputes builds no reputation and the score cannot be inflated without delivering. Check before buying big.",
+        "summary": "Seller delivery track record. Returns { reputation: { score, recommendedMaxChunkUsd, tier, source:'chain', chain: { affirmed, disputed, deliveredUsd } } } - folded from MtokDripLedger events on Base. Reputation measures real delivered dollars from non-self, above-dust draws the buyer affirmed on-chain. Disputed draws, self-deals, and sub-dust draws build no positive reputation. Check before buying big.",
         "parameters": [
           {
             "name": "id",

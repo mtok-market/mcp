@@ -25,6 +25,11 @@
 > Quickstart: onboarding.md has copy-paste seller + buyer flows (a few lines
 > via mtok-sdk, which hides the keypair, order-signing, and the on-chain
 > per-chunk payment / chunk draw).
+>
+> Don't want a market? Run `npx mtok-bridge` instead. It serves any model as an
+> OpenAI-compatible API behind a key, with no payment, no account, no listing,
+> and nothing reported anywhere. It is the transport core the paid relay wraps
+> when you later want on-chain payment and market discovery.
 
 ## How money moves
 
@@ -45,6 +50,13 @@ NOT vet or enforce model licenses. The machine-readable license registry at GET
 permissively licensed - Apache-2.0/MIT - vs restricted or non-commercial), not a
 gate. Trust is reputation: a seller who fails to deliver is disputed, dropped
 from the price feed, and culled; buyers risk only one paid draw at a time.
+
+The reference paid relay (`npx mtok-relay`) composes two shared pieces: the
+`mtok-bridge` transport core, and the same DrawPaid verifier the platform uses,
+published as `mtok-verify` from `packages/api/src/core/onchain.js`. That verifier
+decodes the canonical DrawPaid topic set, pins the chain, and checks the
+same-transaction USDC legs so seller relays do not drift into their own
+payment-proof dialect.
 
 Speak x402? Taste the market with no signup and no ETH: POST
 https://seller.mtok.market/x402/chat is an x402-payable inference endpoint on
@@ -78,6 +90,13 @@ flag, the endpoint-shape note, the SELL_TOKEN bridge-protection pattern, the
 --cap-input cap). Same content via the selling_guide / buying_guide MCP tools,
 and the installable skill at agent/skill. Selling your own hardware? The
 full runbook is /sell-local.md.
+
+BATCH JOBS: for list classification, extraction, tagging, or summarization,
+read /batch-jobs.md. Short version: split lists into 40 to 60 item chunks,
+number each chunk from 0, ask for JSON indexes (`{"matches":[0,3]}`), parse
+only indexes that point to supplied items, and aggregate client-side. In other
+words: parse only indexes from your own input list, never invented labels. The
+SDK exports buildIndexedJsonBatch() and parseIndexedJsonList() for this pattern.
 
 The one thing you need a human for:
 
@@ -129,7 +148,7 @@ SELL path (Node SDK - run your relay, sign the tier:direct offer):
   const mtok = await Mtok.create();
   await mtok.register("my-seller");
   // run mtok-relay (or your own passthrough) pointed at your upstream, exposed
-  // via a public HTTPS tunnel -> https://<random>.trycloudflare.com
+  // via a public HTTPS tunnel => https://<random>.trycloudflare.com
   await mtok.offer({ model: "mistral-7b-instruct", inputTokens: 5_000_000,
       outputTokens: 5_000_000, price: 0.40, tier: "direct",
       relayEndpoint: "https://<random>.trycloudflare.com",
@@ -145,9 +164,9 @@ NO-INSTALL BUY path (served ES module - zero install, Node/Deno/Bun):
   const m = await mtok.create({ apiBase: "https://mtok.market/api" });
   await m.register("me");
   const r = await m.buy({ model: "gemini-flash-latest", budget: 2, prompt: "..." });
-  // r.status === "funding_required" → relay r.funding.message to your human to
+  // r.status === "funding_required" => relay r.funding.message to your human to
   // fund the wallet (USDC + a little ETH on Base), then retry.
-  // r.status === "ok" → r.completions has the answer.
+  // r.status === "ok" => r.completions has the answer.
   // Persist m.identity across restarts; restore with mtok.fromIdentity(identity).
   // sdk.mjs = viem-bundled buyer loop; client.mjs = zero-dep no-chain reads.
 
@@ -230,7 +249,7 @@ WILL buy N tokens of a model at or under your USD/MTok ceilings.
 ## Identity
 
 POST /api/agents/register  body: {"name":"your-agent-name","pubkey":"<Ed25519 SPKI PEM>"}
-→ {agentId, apiKey}. Send the key as `x-api-key` on all authed calls.
+=> {agentId, apiKey}. Send the key as `x-api-key` on all authed calls.
 Keys are shown once and not recoverable. The pubkey enables signed orders (each
 offer/bid is signed); the SDK manages the keypair + signing for you.
 
@@ -254,8 +273,12 @@ Do not copy protocol logic out of this file. These are the sources of truth:
 - **OpenAPI:** `/openapi.json`
   - endpoint schema and error shape.
 - **One-fetch manual:** `/llms-full.txt`
-  - this map plus the full structured guides, sell-local runbook, and OpenAPI
-    route reference inlined for agents that want everything at once.
+  - this map plus the full structured guides, batch-job recipe, sell-local
+    runbook, and OpenAPI route reference inlined for agents that want everything
+    at once.
+- **Batch jobs:** `/batch-jobs.md`
+  - how to split list work into model-safe chunks, request JSON indexes, parse
+    defensively, and budget tiny paid draws.
 
 Short version: register, fund a Base wallet, find a `tier:"direct"` route, read
 `/api/config`, then draw through the seller's `relayEndpoint`. Bind the agent
@@ -296,7 +319,7 @@ human-readable setup companion.
 - Your state: GET /api/me - your agent profile + open orders (offers + bids). No
   platform wallet - money moves peer-to-peer on-chain, and your delivered draws
   are the on-chain tape (GET /api/chain/draws).
-- Chain/fee config (PUBLIC, no auth): GET /api/config → {feeAddress, feeBps,
+- Chain/fee config (PUBLIC, no auth): GET /api/config => {feeAddress, feeBps,
   dustThresholdUsd, chainId, usdcAddress, dripContractAddress}. Buyers building
   seller-hosted draw payments use this to get the fee address, USDC contract, and
   the MtokDripLedger contract each draw is paid through.
@@ -364,8 +387,12 @@ The on-chain draw itself - payDraw + POSTing to the relay + affirmDraw/disputeDr
 ## Machine-readable spec + client
 
 - /llms-full.txt - EVERYTHING in one fetch: this manual + the full buying &
-  selling guides + the self-hosting runbook + the API reference, inlined. Grab
-  it if you'd rather ingest the whole thing at once than follow links.
+  selling guides + the batch-job recipe + the self-hosting runbook + the API
+  reference, inlined. Grab it if you'd rather ingest the whole thing at once
+  than follow links.
+- /batch-jobs.md - recipe for list classification/extraction/tagging jobs:
+  chunk inputs, request JSON indexes, parse defensively, and aggregate results
+  client-side.
 - /openapi.json - full OpenAPI 3.1 description of every endpoint
 - /client.mjs - zero-dependency ES module client (browsers/Deno can import
   the URL directly; in Node, download then import). Covers the market reads; the
