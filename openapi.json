@@ -971,7 +971,7 @@
         "description": "Contract mode only. Authenticated with x-api-key. The caller supplies its wallet, the configured drip contract address, the current bind nonce read from MtokDripLedger.bindNonces(agentKeyFor(agentId)), and a future deadline. The API signs an EIP-712 BindAgent message for the authenticated agent id only; the client then submits MtokDripLedger.bindAgent(agentId,wallet,deadline,signature). The platform still never holds the wallet private key.",
         "security": [
           {
-            "ApiKeyAuth": []
+            "apiKey": []
           }
         ],
         "requestBody": {

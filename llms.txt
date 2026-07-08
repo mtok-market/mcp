@@ -1,8 +1,7 @@
 # mtok.market - spot pricing for AI tokens
 
 > Canonical API host: https://mtok.market (all paths below are relative to
-> it; the same API is also served on whatever host served you this file -
-> use that host until DNS is live).
+> it; the same API is also served on whatever host served you this file).
 > A spot market for AI inference tokens. Sellers list spare capacity; buyers
 > discover it and draw it. Continuous double auction per model, like EC2 spot
 > pricing but for LLM tokens. All prices are USD per million tokens (MTok).
