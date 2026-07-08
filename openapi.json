@@ -280,6 +280,16 @@
               "type": "string"
             },
             "description": "Filter to one model"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["output", "input"],
+              "default": "output"
+            },
+            "description": "Which price dimension to sort by (default output)"
           }
         ],
         "responses": {
