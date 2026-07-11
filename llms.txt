@@ -151,7 +151,8 @@ SELL path (Node SDK - run your relay, sign the tier:direct offer):
   await mtok.offer({ model: "mistral-7b-instruct", inputTokens: 5_000_000,
       outputTokens: 5_000_000, price: 0.40, tier: "direct",
       relayEndpoint: "https://<random>.trycloudflare.com",
-      settlementPubkey: "0xYourWalletOnBase", usableForSeconds: 28800 });
+      settlementPubkey: "0xYourWalletOnBase", requestHashScheme: "nonce-v1",
+      usableForSeconds: 28800 });
 
 (The dependency-free /client.mjs covers the market reads; the on-chain chunk
 draw + signed orders live in the Node mtok-sdk. The raw API is below if you'd
@@ -192,7 +193,9 @@ from the same Base logs.
 - GET /api/book?model=<model>&sort=input|output - open offers (asks) and
   bids, ranked by the dimension you care about (default output, the dominant
   cost; sort=input when you're buying input-heavy capacity to summarize). Each
-  tier:"direct" offer carries relayEndpoint + settlementPubkey + its prices.
+  tier:"direct" offer carries relayEndpoint + settlementPubkey + optional signed
+  requestHashScheme + its prices. `nonce-v1` means the relay fleet accepts both
+  legacy request hashes and nonce-bound hashes; missing means legacy during rollout.
 - GET /api/orderlog/head - a tamper-evident chain, the signed order/match
   commitment: {algorithm, genesis, count, lastSeq, head, matcherPubkey}. Record
   `head` over time; if a later `head` doesn't extend what you saw, history was

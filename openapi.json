@@ -120,6 +120,13 @@
           "settlementPubkey": {
             "type": "string",
             "description": "offers only, direct tier: the seller's EVM wallet address on Base where buyers send USDC chunk payments"
+          },
+          "requestHashScheme": {
+            "type": "string",
+            "enum": [
+              "nonce-v1"
+            ],
+            "description": "offers only: signed relay wire-format marker. nonce-v1 binds a random requestNonce into requestHash; missing means the legacy request-only hash during rolling upgrades"
           }
         }
       },
@@ -428,6 +435,13 @@
                     "type": "string",
                     "description": "REQUIRED for tier:direct. The seller's EVM wallet (0x...) where seller USDC lands before delivery. If you sign the order yourself, it must be inside the signed intent params (the router rebuilds the order from intent.params)."
                   },
+                  "requestHashScheme": {
+                    "type": "string",
+                    "enum": [
+                      "nonce-v1"
+                    ],
+                    "description": "Optional signed rollout marker. Set nonce-v1 only after every relay instance behind relayEndpoint accepts both nonce-v1 and legacy request hashes. Missing keeps old SDK/relay pairs on the legacy request-only hash during a rolling deploy."
+                  },
                   "payoutAddress": {
                     "type": "string",
                     "description": "REQUIRED in non-custodial mode: the seller's EVM wallet (0x...) where seller USDC lands. For a tier:direct offer it is the SAME wallet as settlementPubkey. If you sign the order yourself, it must be inside the signed intent params (the router rebuilds the order from intent.params)."
@@ -467,7 +481,7 @@
         }
       },
       "post": {
-        "summary": "Buy a block of capacity (input + output, priced/capped separately). Returns routes[]: the crossing SELLER-HOSTED (tier:direct) offers, lowest price first, each {offerId, sellerId, relayEndpoint, settlementPubkey, inputPricePerMTok, outputPricePerMTok, availableInputTokens, availableOutputTokens}. Draw paid chunks from a route's relayEndpoint (pay each draw through MtokDripLedger with drawPaidTxHash; see /api/guides/buying). You still need a funded wallet on Base.",
+        "summary": "Buy a block of capacity (input + output, priced/capped separately). Returns routes[]: the crossing SELLER-HOSTED (tier:direct) offers, lowest price first, each {offerId, sellerId, relayEndpoint, settlementPubkey, requestHashScheme?, inputPricePerMTok, outputPricePerMTok, availableInputTokens, availableOutputTokens}. Draw paid chunks from a route's relayEndpoint (pay each draw through MtokDripLedger with drawPaidTxHash; see /api/guides/buying). You still need a funded wallet on Base.",
         "security": [
           {
             "apiKey": []
@@ -535,7 +549,7 @@
         },
         "responses": {
           "201": {
-            "description": "{order, tradeIds, fills, routes[]}; each route includes offerId, sellerId, relayEndpoint, settlementPubkey, inputPricePerMTok, outputPricePerMTok, availableInputTokens, availableOutputTokens"
+            "description": "{order, tradeIds, fills, routes[]}; each route includes offerId, sellerId, relayEndpoint, settlementPubkey, optional signed requestHashScheme, inputPricePerMTok, outputPricePerMTok, availableInputTokens, availableOutputTokens"
           },
           "400": {
             "description": "Validation error"
