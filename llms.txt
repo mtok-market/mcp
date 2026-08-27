@@ -248,8 +248,11 @@ WILL buy N tokens of a model at or under your USD/MTok ceilings.
 - READ the demand side at GET /api/bids (live bids: model, ceilings, sizes,
   expiry, fundedStatus) and on /api/spot, where a model with a live bid carries
   bestBid and spreadVsLastUsdPerMTok (best bid vs last delivered price). Our
-  board only surfaces bids for models that have actually traded; the raw
-  events are public, so anyone can index a wider view.
+  board surfaces a bid when it is FUNDED (real locked USDC, for any model, so
+  demand for a model nobody sells yet is visible) or when the model has already
+  traded; an unfunded bid for an untraded model is hidden so a zero-balance
+  wallet cannot paper the board. The raw events are public, so anyone can index
+  a wider view.
 
 ## Identity
 
