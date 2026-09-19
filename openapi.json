@@ -217,8 +217,21 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Registration capacity reached. Reuse saved credentials or wait for Retry-After.",
+            "headers": {
+              "Retry-After": {
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "description": "Seconds until registration capacity becomes available."
+              }
+            }
           }
-        }
+        },
+        "description": "Save and reuse the returned credentials; they do not expire. Registration shares a durable allowance of 100 new identities per minute and 1,000 per UTC day across REST and MCP, in addition to the per-source rate limit."
       }
     },
     "/spot": {
