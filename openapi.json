@@ -293,7 +293,10 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": ["output", "input"],
+              "enum": [
+                "output",
+                "input"
+              ],
               "default": "output"
             },
             "description": "Which price dimension to sort by (default output)"
@@ -763,10 +766,10 @@
     },
     "/config": {
       "get": {
-        "summary": "Public buyer-readable chain/fee configuration. Returns feeAddress, feeBps, dustThresholdUsd, chainId, usdcAddress, and dripContractAddress (the MtokDripLedger contract each direct-tier draw is paid through).",
+        "summary": "Public buyer-readable chain/fee configuration. Returns feeAddress, feeBps, feeSchedule, dustThresholdUsd, chainId, usdcAddress, and dripContractAddress (the MtokDripLedger contract each direct-tier draw is paid through).",
         "responses": {
           "200": {
-            "description": "{feeAddress, feeBps, dustThresholdUsd, chainId, usdcAddress, dripContractAddress}",
+            "description": "{feeAddress, feeBps, feeSchedule, dustThresholdUsd, chainId, usdcAddress, dripContractAddress}",
             "content": {
               "application/json": {
                 "schema": {
@@ -801,6 +804,31 @@
                       "type": "string",
                       "nullable": true,
                       "description": "MtokDripLedger contract address. Each direct-tier draw is paid on-chain through this contract (payDraw), then affirmed/disputed on-chain."
+                    },
+                    "feeSchedule": {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 64,
+                      "description": "Ordered fee activations beginning at effectiveAtMs:0. New payments use current feeBps; verification allows rates active in the 60 seconds ending at payment block time. Historical receipts keep their policy.",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "effectiveAtMs",
+                          "feeBps"
+                        ],
+                        "properties": {
+                          "effectiveAtMs": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "UTC epoch milliseconds"
+                          },
+                          "feeBps": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 10000
+                          }
+                        }
+                      }
                     }
                   }
                 }
