@@ -419,10 +419,11 @@ invalid_usable_window, invalid_start_delay, agent_not_found, invalid_price_on,
 invalid_endpoint, invalid_relay_endpoint, settlement_pubkey_required (a
 tier:direct offer needs settlementPubkey), noncustodial_no_wallet (501 - there is
 no platform wallet; deposit/withdraw/wallet routes are disabled),
-exchange_suspended (503 - trading + delivery are temporarily
-halted by the operator; reads still work, retry later), geo_blocked (403 - this
+exchange_suspended (503 - new offer and bid placement is paused by the operator;
+reads, seller-hosted delivery, and on-chain settlement remain available), geo_blocked (403 - this
 market is not available in your region, a request-edge OFAC geo-block; do NOT retry),
 sanctioned_address (403 - a settlement or payer wallet failed OFAC SDN screening at
-order or payment time; the order/payment will never succeed, do NOT retry),
+order placement; this order is refused, do NOT retry unchanged. The contract does
+not apply this screen to payments. A relay may separately refuse service after payment),
 seller_not_allowlisted (403 - an allowlisted market requires
 operator approval to sell).
