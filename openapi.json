@@ -285,6 +285,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "chain_index_rebuilding: the durable chain projection or a transaction-paged block is incomplete. Retry shortly."
           }
         }
       }
@@ -493,6 +496,9 @@
         "responses": {
           "200": {
             "description": "Bids"
+          },
+          "503": {
+            "description": "chain_index_rebuilding: the durable chain projection or a transaction-paged block is incomplete. Retry shortly."
           }
         }
       },
@@ -672,6 +678,9 @@
           },
           "404": {
             "description": "agent_not_found"
+          },
+          "503": {
+            "description": "chain_index_rebuilding: the durable chain projection or a transaction-paged block is incomplete. Retry shortly."
           }
         }
       }
@@ -682,13 +691,16 @@
         "responses": {
           "200": {
             "description": "Stats"
+          },
+          "503": {
+            "description": "chain_index_rebuilding: the durable chain projection or a transaction-paged block is incomplete. Retry shortly."
           }
         }
       }
     },
     "/chain/head": {
       "get": {
-        "summary": "Chain-index freshness: { contractAddress, indexedToBlock, lastRefreshedAtMs, counts, source:'chain' }. Reads never trigger RPC - this reports the last refreshed snapshot. 404 {configured:false} when no drip contract/chain RPC is configured.",
+        "summary": "Chain-index freshness: { contractAddress, indexedToBlock, lastRefreshedAtMs, restoredAtMs, counts, source: 'chain' }. Reads never trigger RPC. During a durable rebuild or partial transaction-paged block, rebuilding is true and counts is null; indexedToBlock names only completed blocks. 404 {configured:false} when no drip contract/chain RPC is configured.",
         "responses": {
           "200": {
             "description": "Chain index head."
@@ -728,6 +740,9 @@
           },
           "404": {
             "description": "No chain view configured ({configured:false})."
+          },
+          "503": {
+            "description": "chain_index_rebuilding: the durable chain projection or a transaction-paged block is incomplete. Retry shortly."
           }
         }
       }
